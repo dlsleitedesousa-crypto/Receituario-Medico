@@ -1,22 +1,30 @@
 # Flow Receita — Receituário Médico
 
-Arquivos públicos recuperados de https://receita.drdanielleite.com.br/ em 16/09/2026, preservados sem alterações.
+Arquivos recuperados de https://receita.drdanielleite.com.br/ e da conexão autorizada com a Hostinger em 16/09/2026.
 
 ## Arquivos recuperados
 
 - `index.html`: página principal, com estilos CSS e JavaScript incorporados.
 - `print-summary.js`: recursos de impressão.
 - `backend.js`: integração da página com a API PHP/MySQL da Hostinger.
+- `api/index.php`: API PHP original, com credenciais substituídas por configuração privada.
+- `api/config.example.php`: exemplo de configuração do banco.
+- `LEIA-ME-HOSTINGER.txt`: instruções originais da hospedagem.
+- `api/download` e `download (1)`: arquivos existentes no servidor, preservados com seus nomes originais.
 
 A página pública referencia apenas esses dois arquivos JavaScript externos. As imagens dos locais de atendimento são carregadas durante o uso da aplicação.
 
-## Cópia ainda incompleta
+## Configuração do banco
 
-Este repositório contém a parte pública recuperável pelo navegador. Não é um backup completo da hospedagem.
+Copie `api/config.example.php` para `api/config.local.php` e preencha as credenciais no ambiente de instalação. Esse arquivo privado está no `.gitignore`. Como alternativa, configure `DB_HOST`, `DB_NAME`, `DB_USER` e `DB_PASS` nas variáveis de ambiente do PHP. A configuração da hospedagem existente não foi alterada.
 
-O arquivo `backend.js` utiliza `api/index.php`, cujo código PHP é executado no servidor e não é disponibilizado pelo endereço público. Para completar a cópia, é necessário obter pela Hostinger os arquivos da pasta deste site (incluindo a API e eventuais uploads, configurações e arquivos ocultos). O banco MySQL precisa de uma exportação separada, se for necessário preservar os dados.
+## Limites da recuperação
 
-Antes de versionar os arquivos adicionais, remover credenciais de banco de dados, senhas, chaves e dados pessoais. Configurações privadas e backups do banco não devem ser publicados no GitHub.
+Todos os sete arquivos que a conexão da Hostinger permitiu ler foram recuperados. O oitavo arquivo listado, `database.sql`, teve sua leitura bloqueada pela Hostinger por conteúdo sensível e não foi incluído. Não houve exportação dos dados do MySQL; este repositório não é um backup do banco.
+
+As instruções originais mencionam dois arquivos `.htaccess`, mas eles não foram listados e não puderam ser recuperados nesses caminhos. Os arquivos `api/download` e `download (1)` contêm regras de Apache; seus nomes não foram alterados durante a cópia.
+
+Configurações privadas e backups com dados pessoais não devem ser publicados no GitHub. A sintaxe JavaScript foi verificada; PHP e MySQL precisam de validação em um ambiente com esses serviços.
 
 ## Visualização local
 
@@ -28,4 +36,4 @@ python3 -m http.server 8000 --bind 127.0.0.1
 
 Abra http://127.0.0.1:8000/. Em `localhost` e `127.0.0.1`, o próprio JavaScript original desativa a integração com a API e usa o comportamento local da página. Essa visualização não valida os recursos PHP/MySQL de produção.
 
-Uma instalação em outro domínio depende da API e do banco originais, ainda não incluídos.
+Uma instalação em outro domínio precisa de PHP 8.1 ou superior, PDO MySQL, mbstring e um banco MySQL configurado. A API contém a criação das tabelas necessárias.

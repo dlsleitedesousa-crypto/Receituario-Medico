@@ -9,3 +9,6 @@
 
 # Arquivos locais do sistema
 .DS_Store
+
+# Configuração privada do PHP
+/api/config.local.php

@@ -1,0 +1,45 @@
+FLOW RECEITA — PUBLICAÇÃO NA HOSTINGER
+
+DOMÍNIO
+receita.drdanielleite.com.br
+
+BANCO CONFIGURADO
+- Servidor usado pelo site: localhost
+- Banco: u664296008_receita1
+- Usuário: u664296008_receita1
+- A senha fica somente no arquivo PHP do servidor e nunca no JavaScript.
+- O símbolo % mostrado no hPanel é uma permissão de acesso remoto, não o host.
+
+PUBLICAÇÃO
+1. No hPanel, confirme que o subdomínio receita.drdanielleite.com.br existe.
+2. Abra o Gerenciador de arquivos e entre na pasta raiz desse subdomínio.
+3. Envie e extraia todo o conteúdo do arquivo flow-receita-completo-hostinger.zip.
+4. Confirme que index.html, backend.js, print-summary.js, .htaccess e a pasta api ficaram diretamente na raiz.
+5. Confirme que os dois arquivos .htaccess foram enviados: o da raiz e o da pasta api.
+6. Abra https://receita.drdanielleite.com.br/api/index.php?action=status
+7. Se aparecer JSON com "ok":true, a conexão funcionou e as tabelas foram criadas.
+8. Abra o site e crie o primeiro cadastro médico.
+
+O BACKEND SALVA NO MYSQL
+- Cadastro médico e login seguro com senha criptografada.
+- Locais de atendimento e logotipos.
+- Modelos de receita, laudo, atestado, solicitação de exames e fisioterapia.
+
+OBSERVAÇÕES
+- A redefinição de senha ainda precisa de configuração SMTP para enviar e-mail.
+- O banco não armazena textos de receitas ou dados de pacientes nesta versão.
+- O certificado SSL/HTTPS deve estar ativo antes do uso.
+- Como a senha do MySQL foi compartilhada em conversa, altere-a no hPanel depois
+  da primeira instalação e atualize DB_PASS em api/index.php.
+
+Arquivo principal: index.html
+Backend: api/index.php
+
+ATUALIZAÇÃO DE UM SITE EXISTENTE
+- Faça uma cópia dos arquivos atuais antes de substituir.
+- Preserve as credenciais de banco em api/index.php que já funcionam no servidor.
+- Não é necessário importar database.sql novamente.
+- O .htaccess da raiz define index.html como página inicial e corrige a abertura do teste do banco no endereço principal.
+- Se já houver regras personalizadas no .htaccess da raiz, mantenha-as e acrescente DirectoryIndex index.html index.php no início.
+- Extraia os arquivos diretamente na pasta do subdomínio, sem criar outra pasta dentro dela.
+- Após enviar, abra o site e pressione Ctrl + F5.
