@@ -1,0 +1,11 @@
+# Credenciais e configurações privadas
+.env
+.env.*
+!.env.example
+
+# Exportações de banco de dados
+*.sql
+*.sql.gz
+
+# Arquivos locais do sistema
+.DS_Store
