@@ -30,7 +30,7 @@ Configurações privadas e backups com dados pessoais não devem ser publicados 
 
 Cada alteração de código deve ser verificada, registrada em um commit e enviada ao repositório `dlsleitedesousa-crypto/Receituario-Medico` antes da publicação no site. A orientação para os agentes está em `AGENTS.md`.
 
-Na data desta configuração, o ambiente local não tinha autenticação para enviar os commits e a Hostinger não tinha uma instalação GitHub conectada. Para habilitar a integração, conecte a conta GitHub no hPanel em Sites → Gerenciar → Avançado → Git e conceda acesso a este repositório. A publicação automática ainda não foi ativada.
+Em 16/09/2026, a conexão GitHub da Hostinger foi confirmada e o site foi vinculado ao repositório `dlsleitedesousa-crypto/Receituario-Medico`, branch `main`, na raiz do site. A publicação automática está desativada: o remoto ainda não tinha a branch `main` e o ambiente local não tinha autenticação para enviar os commits. Antes de ativar a publicação, envie os commits e prepare `api/config.local.php` no servidor, preservando essa configuração privada durante o deploy.
 
 A publicação automática envia alterações do GitHub para a Hostinger; edições feitas diretamente no servidor não voltam automaticamente ao GitHub. Faça as alterações pelo repositório para manter o histórico. Dados do banco e credenciais ficam fora desse histórico.
 
