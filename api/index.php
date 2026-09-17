@@ -199,7 +199,7 @@ try {
     }
 
     if ($action === 'models.list') {
-        $stmt = $pdo->prepare('SELECT id,name,type,text FROM models WHERE user_id=? AND category=? ORDER BY updated_at DESC');
+        $stmt = $pdo->prepare('SELECT id,name,type,text FROM models WHERE user_id=? AND category=? ORDER BY name,id');
         $stmt->execute([$userId, (string)$data['category']]);
         respond(['ok' => true, 'items' => $stmt->fetchAll()]);
     }
