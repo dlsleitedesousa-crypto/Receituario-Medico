@@ -12,3 +12,6 @@
 
 # Configuração privada do PHP
 /api/config.local.php
+
+# Configuração privada do SMTP
+/api/mail.local.php

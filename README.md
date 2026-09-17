@@ -45,3 +45,11 @@ python3 -m http.server 8000 --bind 127.0.0.1
 Abra http://127.0.0.1:8000/. Em `localhost` e `127.0.0.1`, o próprio JavaScript original desativa a integração com a API e usa o comportamento local da página. Essa visualização não valida os recursos PHP/MySQL de produção.
 
 Uma instalação em outro domínio precisa de PHP 8.1 ou superior, PDO MySQL, mbstring e um banco MySQL configurado. A API contém a criação das tabelas necessárias.
+
+## Recuperação de senha
+
+A opção “Esqueceu sua senha?” envia um link para criar uma nova senha; a senha original é um hash e não pode ser recuperada. O link expira em 30 minutos, é de uso único e deixa de funcionar se o e-mail ou a senha da conta forem alterados. Há limites de solicitação por e-mail e IP.
+
+Configure o remetente `suporte@receitaflow.drdanielleite.com.br` no servidor copiando `api/mail.example.php` para `api/mail.local.php`. Preencha a senha da caixa apenas no arquivo privado, ou use `SMTP_PASSWORD` no ambiente do PHP. O transporte utiliza `smtp.hostinger.com:465` com TLS e PHPMailer 7.1.1, incluído com sua licença. Preserve `api/mail.local.php` e `api/config.local.php` em todas as publicações. IMAP e POP3 não são usados para enviar mensagens.
+
+A prévia local não envia e-mails nem redefine contas do servidor. Para verificar a recuperação, use o site publicado. Os testes de fluxo podem ser executados com `php tests/password-reset.php`; eles usam SQLite e um envio simulado, sem mensagens reais.

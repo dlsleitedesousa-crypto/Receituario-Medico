@@ -143,8 +143,10 @@ try {
         respond(['ok' => true]);
     }
 
-    if ($action === 'forgot') {
-        respond(['ok' => true]);
+    if (in_array($action, ['forgot', 'reset-password'], true)) {
+        require_once __DIR__ . '/password-reset.php';
+        if ($action === 'forgot') requestPasswordReset($pdo, $data);
+        finishPasswordReset($pdo, $data);
     }
 
     $userId = requireUser();

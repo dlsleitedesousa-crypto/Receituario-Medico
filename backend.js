@@ -63,14 +63,6 @@
       toast('Cadastro concluído. Entre com seu e-mail e senha.');
     } catch (error) { fail(error); }
   };
-  $('#forgotPasswordForm').onsubmit = async event => {
-    event.preventDefault();
-    try {
-      await api('forgot', { email: $('#forgotEmail').value.trim() });
-      show('#loginScreen');
-      toast('Solicitação recebida.');
-    } catch (error) { fail(error); }
-  };
   const logout = async () => {
     try { await api('logout'); } catch (_) {}
     $('#password').value = '';

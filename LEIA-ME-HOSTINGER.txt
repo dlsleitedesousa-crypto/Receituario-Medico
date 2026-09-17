@@ -26,7 +26,9 @@ O BACKEND SALVA NO MYSQL
 - Modelos de receita, laudo, atestado, solicitação de exames e fisioterapia.
 
 OBSERVAÇÕES
-- A redefinição de senha ainda precisa de configuração SMTP para enviar e-mail.
+- A recuperação envia um link de uso único, válido por 30 minutos, para criar uma nova senha.
+- Configure o SMTP em api/mail.local.php (arquivo privado, fora do GitHub).
+- Remetente: suporte@receitaflow.drdanielleite.com.br; smtp.hostinger.com; porta 465 com TLS.
 - O banco não armazena textos de receitas ou dados de pacientes nesta versão.
 - O certificado SSL/HTTPS deve estar ativo antes do uso.
 - Como a senha do MySQL foi compartilhada em conversa, altere-a no hPanel depois
