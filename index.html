@@ -81,7 +81,7 @@ $('#backLogin').onclick=()=>show('#loginScreen');
 $('#openForgotPassword').onclick=()=>{$('#forgotEmail').value=$('#email').value;show('#forgotPasswordScreen');$('#forgotEmail').focus()};
 $('#backLoginFromForgot').onclick=()=>show('#loginScreen');
 $('#forgotPasswordForm').onsubmit=e=>{e.preventDefault();$('#email').value=$('#forgotEmail').value;show('#loginScreen');toast('Instruções para redefinir a senha foram solicitadas.')};
-function doctorSignature(){if(!doctor.name)return 'Assinatura e identificação do profissional';return `<b>${safe(doctor.title)} ${safe(doctor.name)}</b><br>${safe(doctor.specialty)}<br>${safe(doctor.crm)} · RQE ${safe(doctor.rqe)}`}
+function doctorSignature(){if(!doctor.name)return 'Assinatura e identificação do profissional';const crm=String(doctor.crm||'').trim().replace(/^CRM\b[\s:]*/i,'');return `<b>${safe(doctor.title)} ${safe(doctor.name)}</b><br>${safe(doctor.specialty)}<br>CRM ${safe(crm)} · RQE ${safe(doctor.rqe)}`}
 $('#registerForm').onsubmit=e=>{e.preventDefault();doctor={title:$('#doctorTitle').value,name:$('#doctorName').value.trim(),specialty:$('#doctorSpecialty').value.trim(),crm:$('#doctorCrm').value.trim(),rqe:$('#doctorRqe').value.trim()};$('#professionalSignature').innerHTML=doctorSignature();$('#email').value=$('#registerEmail').value;$('#password').value='';show('#loginScreen');toast('Cadastro concluído. Entre com seu e-mail e senha.')};
 $('#logoutButton').onclick=()=>{$('#password').value='';show('#loginScreen');toast('Você saiu da sua conta.')};
 $('#logoutRx').onclick=()=>{$('#password').value='';show('#loginScreen');toast('Você saiu da sua conta.')};
