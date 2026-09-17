@@ -149,6 +149,24 @@ try {
 
     $userId = requireUser();
 
+    if ($action === 'profile.update') {
+        $values = [];
+        foreach (['title', 'name', 'specialty', 'crm', 'rqe', 'email'] as $field) {
+            $values[$field] = trim((string)($data[$field] ?? ''));
+            if ($values[$field] === '') respond(['ok' => false, 'error' => 'Preencha todos os dados do perfil.'], 422);
+        }
+        $values['email'] = mb_strtolower($values['email']);
+        if (!in_array($values['title'], ['Dr.', 'Dra.'], true) || !filter_var($values['email'], FILTER_VALIDATE_EMAIL)) {
+            respond(['ok' => false, 'error' => 'Informe um tratamento e e-mail válidos.'], 422);
+        }
+        foreach (['title' => 8, 'name' => 180, 'specialty' => 180, 'crm' => 80, 'rqe' => 80, 'email' => 190] as $field => $limit) {
+            if (mb_strlen($values[$field]) > $limit) respond(['ok' => false, 'error' => 'O campo ' . $field . ' excede o tamanho permitido.'], 422);
+        }
+        $stmt = $pdo->prepare('UPDATE users SET title=?,name=?,specialty=?,crm=?,rqe=?,email=? WHERE id=?');
+        $stmt->execute([...array_values($values), $userId]);
+        respond(['ok' => true, 'user' => $values]);
+    }
+
     if ($action === 'places.list') {
         $stmt = $pdo->prepare('SELECT id,name,cnes,cnpj,address,phone,logo FROM places WHERE user_id=? ORDER BY name');
         $stmt->execute([$userId]);

@@ -14,11 +14,19 @@
     return result;
   };
   const fail = error => toast(error?.message || 'Não foi possível conectar ao servidor.');
-  const populateUser = user => {
-    doctor = { title: user.title || '', name: user.name || '', specialty: user.specialty || '', crm: user.crm || '', rqe: user.rqe || '' };
-    $('#professionalSignature').innerHTML = doctorSignature();
-    $('#userEmail').textContent = user.name || user.email;
-    $('#rxUserName').textContent = user.name || user.email;
+  const populateUser = applyUserProfile;
+  $('#profileForm').onsubmit = async event => {
+    event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+    const button = $('#saveProfile');
+    button.disabled = true;
+    try {
+      const result = await api('profile.update', profileValues());
+      populateUser(result.user);
+      show(profileReturnScreen);
+      toast('Perfil atualizado com sucesso.');
+    } catch (error) { fail(error); }
+    finally { button.disabled = false; }
   };
   const loadPlaces = async () => {
     const result = await api('places.list');
