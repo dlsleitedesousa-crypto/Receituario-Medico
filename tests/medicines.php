@@ -34,4 +34,10 @@ check(api(1,'save',[...$medicine,'id'=>$id,'type'=>'especial'])->status===200,'U
 check(api(1,'list')->data['items'][0]['type']==='especial','Special type saved');
 check(api(1,'save',[...$medicine,'id'=>$id,'type'=>'especial'])->status===200,'Unchanged update accepted');
 check(api(1,'delete',['id'=>$id])->status===200,'Owner can delete');check(api(1,'list')->data['items']===[],'Deleted medicine gone');
+$blank = api(1,'save',[...$medicine,'ingredient'=>'']);
+check($blank->status===200,'New medicine accepts empty ingredient');
+check(api(1,'list')->data['items'][0]['ingredient']==='','New medicine stores empty ingredient');
+api(1,'delete',['id'=>$blank->data['id']]);
+$omitted=$medicine;unset($omitted['ingredient']);
+check(api(1,'save',$omitted)->status===200,'New medicine accepts omitted ingredient');
 echo "PASS: cadastro, edição, exclusão, validação e isolamento entre usuários.\n";

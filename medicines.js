@@ -3,6 +3,7 @@
   const local = ['localhost', '127.0.0.1'].includes(location.hostname);
   let medicines = [], localMedicines = [], editing = null;
   const selection = new Set();
+  $('#medicineIngredient').required = false;
   const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const api = async (action, payload = {}) => {
     if (local) {
