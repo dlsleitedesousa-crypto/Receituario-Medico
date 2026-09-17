@@ -72,9 +72,9 @@
 <div class="model-layout"><div class="model-library"><label class="model-search field"><span>Buscar medicamentos</span><input id="medicineSearch" type="search" placeholder="Nome ou princípio ativo"></label><div class="actions medicine-selection"><span id="medicineSelectionStatus" role="status" aria-live="polite"></span><button class="btn blue" type="button" id="insertMedicines" disabled>Inserir no receituário</button></div><p id="medicineStatus" role="status" aria-live="polite"></p><div class="model-list" id="medicineList"></div></div>
 <form class="model-form hidden" id="medicineForm"><h2 id="medicineFormTitle">Cadastrar medicamento</h2>
 <label class="field"><span>Nome do medicamento</span><input id="medicineName" maxlength="180" required></label>
-<label class="field"><span>Princípio ativo</span><input id="medicineIngredient" maxlength="180" required></label>
+<label class="field"><span>Princípio ativo (opcional)</span><input id="medicineIngredient" maxlength="180"></label>
 <label class="field"><span>Quantidade</span><input id="medicineQuantity" maxlength="120" placeholder="Ex.: 1 caixa com 30 comprimidos" required></label>
-<label class="field"><span>Prescrição</span><textarea id="medicinePrescription" maxlength="10000" placeholder="Digite a prescrição e as orientações de uso" required></textarea></label>
+<label class="field"><span>Posologia</span><textarea id="medicinePrescription" maxlength="10000" placeholder="Digite a posologia e as orientações de uso" required></textarea></label>
 <label class="field"><span>Tipo de receita</span><select id="medicineType" required><option value="simples">Receita Simples</option><option value="especial">Receita Especial</option></select></label>
 <p id="medicineFormStatus" role="status" aria-live="polite"></p><div class="actions"><button type="button" class="btn outline" id="cancelMedicine">Cancelar</button><button class="btn blue" type="submit" id="saveMedicine">Salvar medicamento</button></div>
 </form></div></main></section>

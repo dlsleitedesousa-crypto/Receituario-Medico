@@ -25,7 +25,7 @@ function handleMedicines(PDO $pdo, int $userId, string $action, array $data): vo
         $values = [];
         foreach (['name' => 180, 'ingredient' => 180, 'quantity' => 120, 'prescription' => 10000] as $field => $limit) {
             $values[$field] = trim((string)($data[$field] ?? ''));
-            if ($values[$field] === '' || mb_strlen($values[$field]) > $limit) {
+            if (($field !== 'ingredient' && $values[$field] === '') || mb_strlen($values[$field]) > $limit) {
                 respond(['ok' => false, 'error' => 'Preencha os dados do medicamento e respeite o tamanho permitido.'], 422);
             }
         }

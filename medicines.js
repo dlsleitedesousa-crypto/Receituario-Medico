@@ -80,7 +80,7 @@
     event.preventDefault(); if (!event.currentTarget.reportValidity()) return;
     const payload = { id: editing };
     for (const key of ['name', 'ingredient', 'quantity', 'prescription', 'type']) payload[key] = $('#medicine' + key[0].toUpperCase() + key.slice(1)).value.trim();
-    if (Object.values(payload).some(value => value === '')) { $('#medicineFormStatus').textContent = 'Preencha todos os dados do medicamento.'; return; }
+    if (['name', 'quantity', 'prescription'].some(key => payload[key] === '')) { $('#medicineFormStatus').textContent = 'Preencha nome, quantidade e posologia.'; return; }
     const button = $('#saveMedicine'); button.disabled = true;
     try { await api('save', payload); await load(); closeForm(); $('#medicineStatus').textContent = 'Medicamento salvo.'; }
     catch (error) { $('#medicineFormStatus').textContent = error.message; }
@@ -91,7 +91,7 @@
     const previous = $('#rxText').value.trimEnd();
     const special = chosen.some(item => item.type === 'especial') || (previous.trim() && $('.type-card.active').dataset.type === 'especial');
     $(`.type-card[data-type="${special ? 'especial' : 'simples'}"]`).click();
-    const blocks = chosen.map(item => `${item.name}\nPrincípio ativo: ${item.ingredient}\nQuantidade: ${item.quantity}\n${item.prescription}`);
+    const blocks = chosen.map(item => `${item.name}-----------${item.quantity}\n${item.prescription}`);
     $('#rxText').value = [previous, ...blocks].filter(Boolean).join('\n\n');
     selection.clear(); updateSelection(); show('#rxScreen'); toast('Medicamentos incluídos no receituário.');
   };

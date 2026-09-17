@@ -25,6 +25,8 @@ $r=api(1,'save',$medicine);check($r->status===200,'Create medicine');$id=$r->dat
 check(count(api(1,'list')->data['items'])===1,'Owner can list');check(api(2,'list')->data['items']===[],'Other account cannot list');
 check(api(2,'save',[...$medicine,'id'=>$id,'name'=>'Outro'])->status===404,'Other account cannot edit');
 check(api(2,'delete',['id'=>$id])->status===404,'Other account cannot delete');
+check(api(1,'save',[...$medicine,'id'=>$id,'ingredient'=>''])->status===200,'Optional ingredient accepted');
+check(api(1,'list')->data['items'][0]['ingredient']==='','Empty ingredient saved');
 check(api(1,'save',[...$medicine,'type'=>'invalid'])->status===422,'Invalid recipe type');
 check(api(1,'save',[...$medicine,'quantity'=>' '])->status===422,'Empty field');
 check(api(1,'save',[...$medicine,'name'=>str_repeat('a',181)])->status===422,'Long field');
