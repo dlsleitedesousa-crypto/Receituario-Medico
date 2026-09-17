@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Flow Receita — Receituário</title>
 <style>
 :root{--blue:#1167e8;--navy:#152238;--muted:#69778b;--line:#dce3ec;--bg:#f4f7fb;--card:#fff;--green:#198754;--red:#dc4e5a;--shadow:0 12px 42px #24385414}*{box-sizing:border-box}body{margin:0;font:15px/1.45 Inter,Segoe UI,Arial,sans-serif;color:var(--navy);background:var(--bg)}button,input,textarea,select{font:inherit}button{cursor:pointer}.screen{min-height:100vh}.hidden{display:none!important}.logo{display:flex;align-items:center;gap:12px}.mark{width:50px;height:50px;border-radius:14px;background:linear-gradient(145deg,#1d78f2,#0748ae);display:grid;place-items:center;color:#fff;font-weight:900;font-size:22px}.logo b{display:block;font-size:18px}.logo small{color:var(--muted)}.btn{border:0;border-radius:9px;padding:12px 18px;font-weight:700}.btn.blue{background:var(--blue);color:#fff}.btn.outline{background:#fff;border:1px solid var(--line);color:var(--navy)}.btn.red{background:#fff0f1;color:var(--red);border:1px solid #ffcdd2}.field{display:block;margin:15px 0}.field span{display:block;font-weight:700;margin-bottom:6px}.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:12px;background:#fff;outline:none}.field input:focus,.field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1167e817}
@@ -25,11 +25,94 @@
 .patient-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.patient-heading h3{margin:0}.patient-heading .btn{padding:6px 12px;font-size:13px}
 .patient-heading{flex-wrap:wrap}.patient-heading h3{flex:1}.patient-heading #clearPatient{margin-left:auto}.summary-content{white-space:pre-wrap;overflow-wrap:anywhere}.summary-list{display:grid;gap:16px}.summary-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .medicine-selection{align-items:center;justify-content:space-between;flex-wrap:wrap}.medicine-select{display:flex;align-items:center;gap:10px;margin:12px 0}.medicine-select input{width:20px;height:20px;accent-color:var(--blue)}.medicine-card p{white-space:pre-wrap;overflow-wrap:anywhere}.medicine-card h3{overflow-wrap:anywhere}@media(max-width:850px){#rxScreen>.top{height:auto;min-height:78px;flex-wrap:wrap;gap:12px}}
+
+/* Layout adaptável; regras de tela não alteram o documento impresso. */
+@media screen {
+  html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  .screen { min-height:100svh; }
+  button, .upload-box { touch-action:manipulation; }
+  button:focus-visible, .upload-box:focus-within { outline:3px solid var(--blue); outline-offset:3px; }
+  input, textarea, select { min-width:0; max-width:100%; }
+  .field input, .field select, .field textarea, .model-search input, .custom-title-controls input { font-size:16px; }
+  textarea { resize:vertical; }
+  .field input, .field select { min-height:46px; }
+  .btn, .back, .place-actions button, .model-actions button, .link-button, .logout-button { min-height:44px; }
+  .logout-button { display:inline-flex; align-items:center; padding:6px 10px; font-size:14px; }
+  .logo, .top>*, .rx-head>*, .models-heading>*, .model-layout>*, .rx-grid>*, .register-grid>*, .form-row>*, .clinic-head>*, .type-card>div { min-width:0; }
+  .mark, .radio { flex-shrink:0; }
+  .top { height:auto; min-height:78px; flex-wrap:wrap; gap:12px 20px; padding-left:max(20px,env(safe-area-inset-left)); padding-right:max(20px,env(safe-area-inset-right)); padding-top:max(10px,env(safe-area-inset-top)); }
+  .top .user, .rx-session { overflow-wrap:anywhere; }
+  .rx-head, .models-heading, .form-title-row { flex-wrap:wrap; }
+  .rx-actions, .actions, .register-actions { flex-wrap:wrap; }
+  .rx-head>div:not(.rx-actions) { flex:1 1 220px; }
+  .rx-grid { grid-template-columns:340px minmax(0,1fr); }
+  .model-layout { grid-template-columns:minmax(0,1fr) minmax(300px,430px); }
+  .place-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .place-card, .model-card, .clinic-meta, .doc-heading, .clinic-footer, .signature, .summary-heading, .form-title-row { overflow-wrap:anywhere; }
+  .signature:before { max-width:100%; }
+  .patient-heading { display:flex; gap:8px; align-items:center; }
+  .patient-heading h3 { margin-bottom:0; }
+  .toast { z-index:60; max-width:calc(100% - 32px); right:max(16px,env(safe-area-inset-right)); bottom:max(16px,env(safe-area-inset-bottom)); }
+  /* A prévia mantém as dimensões A4 para paginar e permite rolagem horizontal. */
+  .print-overlay { padding:0 16px max(24px,env(safe-area-inset-bottom)); overscroll-behavior:contain; }
+  .preview-toolbar { position:sticky; top:0; left:-16px; height:auto; min-height:62px; gap:12px; flex-wrap:wrap; margin:0 -16px 16px; padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left)); }
+  .preview-toolbar>div { flex-wrap:wrap; align-items:center; }
+  .print-overlay>.paper, .print-overlay>.special-sheet { width:210mm; max-width:none; }
+  .text-scale-control { flex-wrap:wrap; white-space:normal; }
+  .text-scale-control input[type="range"] { min-height:44px; }
+}
+@media screen and (max-width:1100px) {
+  .rx-grid, .model-layout { grid-template-columns:minmax(0,1fr); }
+  .model-form { position:static; }
+  .side { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 14px; }
+  .side>.patient-box, .side>h3, .side>.custom-title-card { grid-column:1/-1; }
+  .patient-box { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 14px; }
+  .patient-heading, .patient-box>.field:first-of-type { grid-column:1/-1; }
+  .paper { min-height:auto; }
+  .rx-actions { flex:1 1 100%; margin-left:0; }
+  .rx-actions .btn { flex:1; }
+  .place-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media screen and (max-width:600px) {
+  .login-art { display:none; }
+  .login-card { padding:24px max(16px,env(safe-area-inset-left)); }
+  .register-screen { padding:20px max(12px,env(safe-area-inset-left)); }
+  .register-card { padding:22px 16px; }
+  .register-grid, .form-row, .place-grid, .side, .patient-box { grid-template-columns:minmax(0,1fr); }
+  .page, .models-page { padding:24px max(16px,env(safe-area-inset-left)); }
+  .rx-page { padding:12px max(12px,env(safe-area-inset-left)); }
+  .top .logo { flex:1 1 100%; }
+  .top .user, .rx-session { margin-left:0; text-align:left; border-left:0; padding-left:0; flex:1 1 100%; }
+  .top .receipt-nav { margin-left:0; }
+  .rx-session .logout-button, .top .logout-button { margin:0; }
+  .top .logo small, .top .user small { display:block; }
+  .models-heading { gap:12px; }
+  .models-heading>div { flex:1 1 100%; }
+  .models-heading>.btn { margin-left:0; flex:1 1 100%; }
+  .page h1, .models-heading h1, .register-card h1 { font-size:28px; }
+  .side, .place-form, .model-form, .model-card { padding:16px; }
+  .paper { padding:18px 14px; }
+  .clinic-head { grid-template-columns:76px minmax(0,1fr); gap:12px; }
+  .clinic-logo { width:76px; height:64px; }
+  .clinic-fallback { width:64px; height:64px; }
+  .rx-body { padding:18px 0; }
+  .actions>.btn, .register-actions>.btn, .model-actions>button { flex:1 1 140px; }
+  .patient-heading>.btn { flex:1 1 100%; }
+  .preview-toolbar>div { width:100%; gap:8px; }
+  .preview-toolbar .text-scale-control { width:100%; }
+  .preview-toolbar .btn { flex:1 1 120px; padding:10px; }
+  .preview-toolbar b { font-size:16px; }
+  .preview-toolbar b::after { content:"Deslize a folha para os lados para conferir o A4."; display:block; font-size:12px; font-weight:400; margin-top:4px; }
+  .upload-box { aspect-ratio:auto; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .place-card, .upload-box, .toast { transition:none; }
+}
 </style>
 </head><body>
 <section class="screen login" id="loginScreen">
  <div class="login-art"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small style="color:#dbeaff">receituário digital</small></div></div><h1>Prescrever com clareza. Trabalhar com agilidade.</h1><p>Um ambiente simples para organizar locais de atendimento e preparar receituários.</p></div>
- <div class="login-card"><form class="login-box" id="loginForm"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Acesso seguro</small></div></div><h2>Bem-vindo(a)</h2><p>Entre para acessar seus locais e receituários.</p><label class="field"><span>E-mail</span><input id="email" type="email" placeholder="seu@email.com" required></label><label class="field"><span>Senha</span><input id="password" type="password" placeholder="Digite sua senha" required></label><button class="btn blue" type="submit">Entrar</button><p class="signup-link">Ainda não possui cadastro? <button class="link-button" type="button" id="openRegister">Cadastre-se</button></p><p class="signup-link" style="margin-top:4px!important">Esqueceu sua senha? <button class="link-button" type="button" id="openForgotPassword">Clique aqui</button></p></form></div>
+ <div class="login-card"><form class="login-box" id="loginForm"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Acesso seguro</small></div></div><h2>Bem-vindo(a)</h2><p>Entre para acessar seus locais e receituários.</p><label class="field"><span>E-mail</span><input id="email" autocomplete="username" type="email" placeholder="seu@email.com" required></label><label class="field"><span>Senha</span><input id="password" autocomplete="current-password" type="password" placeholder="Digite sua senha" required></label><button class="btn blue" type="submit">Entrar</button><p class="signup-link">Ainda não possui cadastro? <button class="link-button" type="button" id="openRegister">Cadastre-se</button></p><p class="signup-link" style="margin-top:4px!important">Esqueceu sua senha? <button class="link-button" type="button" id="openForgotPassword">Clique aqui</button></p></form></div>
 </section>
 <section class="screen register-screen hidden" id="registerScreen">
  <form class="register-card" id="registerForm"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Cadastro médico</small></div></div><h1>Crie seu cadastro</h1><p>Informe seus dados profissionais e defina os dados de acesso.</p><div class="register-grid"><label class="field wide"><span>Nome do médico</span><input id="doctorName" autocomplete="name" placeholder="Nome completo" required></label><label class="field"><span>Tratamento</span><select id="doctorTitle" required><option value="Dr.">Dr. (masculino)</option><option value="Dra.">Dra. (feminino)</option></select></label><label class="field"><span>Especialidade médica</span><input id="doctorSpecialty" placeholder="Ex.: Ortopedia e Traumatologia" required></label><label class="field"><span>CRM</span><input id="doctorCrm" placeholder="Ex.: CRM 5275-PI" required></label><label class="field"><span>RQE</span><input id="doctorRqe" placeholder="Número do RQE" required></label><label class="field"><span>E-mail</span><input id="registerEmail" type="email" autocomplete="email" placeholder="seu@email.com" required></label><label class="field"><span>Senha</span><input id="registerPassword" type="password" autocomplete="new-password" minlength="4" placeholder="Crie uma senha" required></label></div><div class="register-actions"><button class="btn outline" type="button" id="backLogin">Voltar ao login</button><button class="btn blue" type="submit">Concluir</button></div></form>
@@ -42,7 +125,7 @@
 <section class="screen hidden" id="placesScreen">
  <header class="top"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Locais de atendimento</small></div></div><div class="user"><b id="userEmail">Profissional</b><small>Conta do profissional</small><button class="logout-button open-profile" type="button">Meu perfil</button><button class="logout-button" type="button" id="logoutButton">Sair</button></div></header>
  <main class="page"><span class="eyebrow">Configuração</span><h1>Onde você atende?</h1><p class="lead">Use “Atender” para abrir o receituário, ou edite e exclua seus locais.</p><div class="place-grid" id="placeGrid"></div>
- <form class="place-form hidden" id="placeForm"><div class="form-title-row"><h2 id="placeFormTitle">Novo local de trabalho</h2><span class="eyebrow" id="editBadge"></span></div><label class="upload-box" id="uploadBox"><input id="placeLogo" type="file" accept="image/png,image/jpeg,image/webp"><img class="upload-preview" id="logoPreview" alt="Prévia do logotipo"><strong>Selecionar logotipo da clínica</strong><small>PNG, JPG ou WebP · recomendado fundo transparente</small><small>Tamanho ideal: 600 × 300 px (proporção 2:1) · máximo 2 MB</small><span class="logo-file-info" id="logoFileInfo">Nenhum arquivo selecionado</span></label><div class="form-row"><label class="field"><span>Nome do local</span><input id="placeName" placeholder="Ex.: Clínica Centro" required></label><label class="field"><span>CNES</span><input id="placeCnes" placeholder="Opcional"></label><label class="field"><span>CNPJ</span><input id="placeCnpj" placeholder="00.000.000/0000-00"></label></div><div class="form-row"><label class="field"><span>Endereço</span><input id="placeAddress" placeholder="Rua, número, bairro e cidade"></label><label class="field"><span>Telefone</span><input id="placePhone" placeholder="(00) 00000-0000"></label><div></div></div><div class="actions"><button type="button" class="btn outline" id="cancelPlace">Cancelar</button><button class="btn blue" type="submit" id="savePlaceBtn">Salvar local</button></div></form></main>
+ <form class="place-form hidden" id="placeForm"><div class="form-title-row"><h2 id="placeFormTitle">Novo local de trabalho</h2><span class="eyebrow" id="editBadge"></span></div><label class="upload-box" id="uploadBox"><input id="placeLogo" type="file" accept="image/png,image/jpeg,image/webp"><img class="upload-preview" id="logoPreview" alt="Prévia do logotipo"><strong>Selecionar logotipo da clínica</strong><small>PNG, JPG ou WebP · recomendado fundo transparente</small><small>Tamanho ideal: 600 × 300 px (proporção 2:1) · máximo 2 MB</small><span class="logo-file-info" id="logoFileInfo">Nenhum arquivo selecionado</span></label><div class="form-row"><label class="field"><span>Nome do local</span><input id="placeName" placeholder="Ex.: Clínica Centro" required></label><label class="field"><span>CNES</span><input id="placeCnes" placeholder="Opcional"></label><label class="field"><span>CNPJ</span><input id="placeCnpj" placeholder="00.000.000/0000-00"></label></div><div class="form-row"><label class="field"><span>Endereço</span><input id="placeAddress" placeholder="Rua, número, bairro e cidade"></label><label class="field"><span>Telefone</span><input id="placePhone" type="tel" autocomplete="tel" placeholder="(00) 00000-0000"></label><div></div></div><div class="actions"><button type="button" class="btn outline" id="cancelPlace">Cancelar</button><button class="btn blue" type="submit" id="savePlaceBtn">Salvar local</button></div></form></main>
 </section>
 <section class="screen hidden" id="modelsScreen">
  <header class="top"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Modelos de receita</small></div></div><div class="user"><b id="modelsUserName">Profissional</b><small>Biblioteca de modelos</small></div></header>
