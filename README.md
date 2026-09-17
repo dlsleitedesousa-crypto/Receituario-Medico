@@ -53,3 +53,9 @@ A opção “Esqueceu sua senha?” envia um link para criar uma nova senha; a s
 Configure o remetente `suporte@receitaflow.drdanielleite.com.br` no servidor copiando `api/mail.example.php` para `api/mail.local.php`. Preencha a senha da caixa apenas no arquivo privado, ou use `SMTP_PASSWORD` no ambiente do PHP. O transporte utiliza `smtp.hostinger.com:465` com TLS e PHPMailer 7.1.1, incluído com sua licença. Preserve `api/mail.local.php` e `api/config.local.php` em todas as publicações. IMAP e POP3 não são usados para enviar mensagens.
 
 A prévia local não envia e-mails nem redefine contas do servidor. Para verificar a recuperação, use o site publicado. Os testes de fluxo podem ser executados com `php tests/password-reset.php`; eles usam SQLite e um envio simulado, sem mensagens reais.
+
+## Medicamentos
+
+A aba “Medicamentos”, no topo do receituário, permite cadastrar nome, princípio ativo, quantidade, prescrição e tipo de receita. A busca considera nome e princípio ativo; a seleção de vários itens é mantida ao filtrar. A inserção acrescenta os medicamentos ao texto existente. Se houver um item especial, todos entram na receita especial; acrescentar um item simples a uma receita especial mantém seu tipo.
+
+No site publicado, os cadastros são salvos na tabela `medicines`, vinculados ao usuário autenticado. Eles podem ser editados e excluídos na biblioteca. Na prévia local, ficam apenas na memória da página. Cadastros de medicamentos são dados dos usuários e não são versionados no GitHub. Execute `php tests/medicines.php` para validar cadastro, edição, exclusão e isolamento entre contas.

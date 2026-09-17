@@ -151,6 +151,11 @@ try {
 
     $userId = requireUser();
 
+    if (str_starts_with($action, 'medicines.')) {
+        require_once __DIR__ . '/medicines.php';
+        handleMedicines($pdo, $userId, $action, $data);
+    }
+
     if ($action === 'profile.update') {
         $values = [];
         foreach (['title', 'name', 'specialty', 'crm', 'rqe', 'email'] as $field) {
