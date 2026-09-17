@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 session_save_path('/tmp');
 session_start();
 require __DIR__ . '/../api/password-reset.php';
