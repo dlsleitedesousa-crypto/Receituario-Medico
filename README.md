@@ -59,3 +59,9 @@ A prévia local não envia e-mails nem redefine contas do servidor. Para verific
 A aba “Medicamentos”, no topo do receituário, permite cadastrar nome, princípio ativo opcional, quantidade, posologia e tipo de receita. A busca considera nome e princípio ativo; a seleção de vários itens é mantida ao filtrar. A inserção acrescenta os medicamentos ao texto existente, com `Nome-----------Quantidade` na primeira linha e a posologia a partir da segunda linha. Se houver um item especial, todos entram na receita especial; acrescentar um item simples a uma receita especial mantém seu tipo.
 
 No site publicado, os cadastros são salvos na tabela `medicines`, vinculados ao usuário autenticado. Eles podem ser editados e excluídos na biblioteca. Na prévia local, ficam apenas na memória da página. Cadastros de medicamentos são dados dos usuários e não são versionados no GitHub. Execute `php tests/medicines.php` para validar cadastro, edição, exclusão e isolamento entre contas.
+
+## Impressão em PDF
+
+O botão “Imprimir ou salvar PDF” gera um PDF A4 no próprio navegador e abre o arquivo em uma nova aba. No iPhone e iPad, use Compartilhar → Imprimir no visualizador de PDF. Cada folha da prévia corresponde a uma página do arquivo; a receita especial mantém as duas vias. A geração usa imagens em resolução dupla e preserva o conteúdo visual, mas o texto do PDF não é selecionável.
+
+Publique também `print-pdf.js` e a pasta `vendor/`. As bibliotecas html2canvas 1.4.1 e jsPDF 4.2.1 ficam no próprio site, com suas licenças; são carregadas apenas ao gerar o PDF. O documento é processado localmente, sem envio dos dados do paciente a um serviço de PDF.
