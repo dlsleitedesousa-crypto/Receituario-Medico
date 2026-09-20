@@ -224,9 +224,19 @@ try {
     }
 
     if ($action === 'patients.list') {
-        $stmt = $pdo->prepare('SELECT p.id,p.name,p.cpf,p.birth_date,COUNT(a.id) AS appointments FROM patients p INNER JOIN appointments a ON a.patient_id=p.id AND a.user_id=p.user_id WHERE p.user_id=? GROUP BY p.id ORDER BY p.name,p.id');
+        $stmt = $pdo->prepare('SELECT p.id,p.name,p.cpf,p.birth_date,COUNT(a.id) AS appointments FROM patients p LEFT JOIN appointments a ON a.patient_id=p.id AND a.user_id=p.user_id WHERE p.user_id=? GROUP BY p.id ORDER BY p.name,p.id');
         $stmt->execute([$userId]);
         respond(['ok' => true, 'items' => $stmt->fetchAll()]);
+    }
+    if ($action === 'patients.history') {
+        $patientId = (int)($data['id'] ?? 0);
+        $stmt = $pdo->prepare('SELECT id,name,cpf,birth_date FROM patients WHERE id=? AND user_id=?');
+        $stmt->execute([$patientId,$userId]);
+        $patient = $stmt->fetch();
+        if (!$patient) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
+        $stmt = $pdo->prepare('SELECT a.id,a.document_type,a.document_title,a.document_text,a.document_date,a.created_at,p.name AS place_name FROM appointments a LEFT JOIN places p ON p.id=a.place_id AND p.user_id=a.user_id WHERE a.patient_id=? AND a.user_id=? ORDER BY a.created_at DESC,a.id DESC');
+        $stmt->execute([$patientId,$userId]);
+        respond(['ok' => true, 'patient' => $patient, 'items' => $stmt->fetchAll()]);
     }
     if ($action === 'patients.save' || $action === 'appointments.save') {
         $name = trim((string)($data['name'] ?? ''));

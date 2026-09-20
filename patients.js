@@ -2,6 +2,8 @@
 (() => {
   const list = document.querySelector('#patientList');
   const search = document.querySelector('#patientSearch');
+  const detail = document.querySelector('#patientDetail');
+  const history = document.querySelector('#patientHistory');
   const placesTab = document.querySelector('#placesTab');
   const patientsTab = document.querySelector('#patientsTab');
   const selectTab = target => {
@@ -37,6 +39,38 @@
     }
     return true;
   };
+  const formatDate = value => String(value || '').slice(0, 10).split('-').reverse().join('/');
+  const formatCpf = value => String(value || '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const showHistory = async patient => {
+    detail.classList.remove('hidden');
+    document.querySelector('#patientDetailName').textContent = patient.name;
+    document.querySelector('#patientDetailData').textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)}`;
+    history.textContent = 'Carregando atendimentos...';
+    detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      const result = await request('patients.history', { id: patient.id });
+      history.replaceChildren();
+      if (!result.items.length) {
+        const empty = document.createElement('p');
+        empty.textContent = 'Nenhum atendimento salvo para este paciente.';
+        history.append(empty);
+        return;
+      }
+      result.items.forEach(item => {
+        const card = document.createElement('article');
+        card.className = 'history-card';
+        const heading = document.createElement('h4');
+        heading.textContent = item.document_title;
+        const meta = document.createElement('small');
+        meta.textContent = `${formatDate(item.document_date)} · ${item.place_name || 'Local removido'}`;
+        const content = document.createElement('pre');
+        content.textContent = item.document_text;
+        card.append(heading, meta, content);
+        history.append(card);
+      });
+    } catch (error) { history.textContent = ''; notifyError(error); }
+  };
+  document.querySelector('#closePatientDetail').onclick = () => detail.classList.add('hidden');
   const render = () => {
     const query = search.value.toLocaleLowerCase('pt-BR').replace(/\D/g, '');
     const nameQuery = search.value.toLocaleLowerCase('pt-BR').trim();
@@ -51,24 +85,36 @@
     matching.forEach(patient => {
       const row = document.createElement('article');
       row.className = 'patient-row';
+      row.tabIndex = 0;
+      row.setAttribute('aria-label', `Ver histórico de ${patient.name}`);
+      row.onclick = event => { if (!event.target.closest('button')) showHistory(patient); };
+      row.onkeydown = event => { if (event.target === row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); showHistory(patient); } };
       const info = document.createElement('div');
       const title = document.createElement('strong');
       title.textContent = patient.name;
       const details = document.createElement('small');
-      details.textContent = `CPF ${patient.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')} · Nascimento ${patient.birth_date.split('-').reverse().join('/')} · ${patient.appointments} atendimento(s)`;
+      details.textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)} · ${patient.appointments} atendimento(s)`;
       info.append(title, details);
+      const historyButton = document.createElement('button');
+      historyButton.type = 'button';
+      historyButton.className = 'btn blue';
+      historyButton.textContent = 'Ver histórico';
+      historyButton.onclick = () => showHistory(patient);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'btn outline';
       button.textContent = 'Usar paciente';
       button.onclick = () => {
         document.querySelector('#patientName').value = patient.name;
-        document.querySelector('#patientDoc').value = patient.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        document.querySelector('#patientDoc').value = formatCpf(patient.cpf);
         document.querySelector('#patientBirthDate').value = patient.birth_date;
         selectTab('places');
         toast('Paciente selecionado. Clique em “Atender” no local desejado.');
       };
-      row.append(info, button);
+      const actions = document.createElement('div');
+      actions.className = 'patient-row-actions';
+      actions.append(historyButton, button);
+      row.append(info, actions);
       list.append(row);
     });
   };
@@ -99,6 +145,6 @@
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
-  document.addEventListener('patients:load', () => { selectTab('places'); load().catch(notifyError); });
+  document.addEventListener('patients:load', () => { detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();
