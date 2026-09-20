@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Flow Receita">
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1d78f2"/>
+      <stop offset="1" stop-color="#0748ae"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="17" fill="url(#blue)"/>
+  <path fill="#fff" d="M13 17h20v6H20v7h11v6H20v12h-7V17Zm23 0h10c9 0 13 4 13 11 0 5-2 8-6 10l7 10h-8l-6-9h-3v9h-7V17Zm7 6v10h3c4 0 6-2 6-5s-2-5-6-5h-3Z"/>
+</svg>
