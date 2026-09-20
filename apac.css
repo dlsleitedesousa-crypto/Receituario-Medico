@@ -1,4 +1,7 @@
 .apac-editor{position:fixed;inset:0;z-index:55;background:#152238aa;overflow:auto;padding:24px;display:grid;place-items:center}
+.rx-actions #createApac,.apac-document-button{background:#e9f4ff;border:2px solid #1167e8;color:#0748ae}
+.apac-document-button{display:block;width:100%;border-radius:11px;padding:15px;text-align:left;cursor:pointer;margin:10px 0;font:inherit}
+.apac-document-button b,.apac-document-button small{display:block}.apac-document-button small{color:#345982;margin-top:3px}
 .apac-editor-panel{width:min(850px,100%);background:#fff;border-radius:16px;padding:28px;box-shadow:0 20px 60px #0003}
 .apac-editor-head{display:flex;justify-content:space-between;align-items:start;gap:16px}.apac-editor-head h2{margin:0}.apac-editor-head p{margin:4px 0 14px;color:#69778b}
 .apac-fields{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 14px}.apac-fields .apac-wide{grid-column:1/-1}.apac-fields textarea{resize:vertical}

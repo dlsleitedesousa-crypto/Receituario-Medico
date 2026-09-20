@@ -1,10 +1,6 @@
 /* Laudo de solicitação/autorização de procedimento ambulatorial (APAC). */
 (() => {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'btn outline';
-  button.textContent = 'Criar APAC';
-  document.querySelector('#printRx').before(button);
+  const buttons = [...document.querySelectorAll('.apac-launch')];
 
   const form = document.createElement('section');
   form.className = 'apac-editor hidden';
@@ -31,12 +27,13 @@
   const close = () => { form.classList.add('hidden'); document.body.classList.remove('apac-editing'); };
   $('#closeApac').onclick = close;
   form.onclick = event => { if (event.target === form) close(); };
-  button.onclick = () => {
+  const open = () => {
     if (!$('#patientName').value.trim()) { toast('Informe o nome do paciente antes de criar a APAC.'); $('#patientName').focus(); return; }
     form.classList.remove('hidden');
     document.body.classList.add('apac-editing');
     $('#apacProcedure').focus();
   };
+  buttons.forEach(button => { button.onclick = open; });
   $('#apacForm').onsubmit = event => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
