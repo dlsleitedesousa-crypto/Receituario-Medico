@@ -42,6 +42,7 @@
       const result = await api('login', { email: $('#email').value.trim(), password: $('#password').value });
       populateUser(result.user);
       await loadPlaces();
+      document.dispatchEvent(new Event('patients:load'));
       show('#placesScreen');
     } catch (error) { fail(error); }
   };
@@ -170,7 +171,7 @@
   api('status').then(result => {
     if (result.authenticated && result.user) {
       populateUser(result.user);
-      loadPlaces().then(() => show('#placesScreen')).catch(fail);
+      loadPlaces().then(() => { document.dispatchEvent(new Event('patients:load')); show('#placesScreen'); }).catch(fail);
     }
   }).catch(() => {});
 })();

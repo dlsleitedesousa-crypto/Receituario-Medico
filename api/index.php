@@ -93,6 +93,31 @@ try {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_models_user_category (user_id, category)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $schemaTable = 'patients';
+    $pdo->exec("CREATE TABLE IF NOT EXISTS patients (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT UNSIGNED NOT NULL,
+        name VARCHAR(180) NOT NULL,
+        cpf CHAR(11) NOT NULL,
+        birth_date DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_patient_user_cpf (user_id, cpf),
+        INDEX idx_patients_user_name (user_id, name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $schemaTable = 'appointments';
+    $pdo->exec("CREATE TABLE IF NOT EXISTS appointments (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT UNSIGNED NOT NULL,
+        patient_id BIGINT UNSIGNED NOT NULL,
+        place_id BIGINT UNSIGNED NOT NULL,
+        document_type VARCHAR(30) NOT NULL,
+        document_title VARCHAR(180) NOT NULL,
+        document_text MEDIUMTEXT NOT NULL,
+        document_date DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_appointments_patient (user_id, patient_id, created_at),
+        INDEX idx_appointments_place (user_id, place_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 } catch (Throwable $e) {
     error_log('Flow Receita schema [' . ($schemaTable ?? 'unknown') . ']: ' . $e->getMessage());
     $mysqlCode = ($e instanceof PDOException && isset($e->errorInfo[1])) ? (string)$e->errorInfo[1] : 'SQL';
@@ -196,6 +221,46 @@ try {
         $stmt = $pdo->prepare('DELETE FROM places WHERE id=? AND user_id=?');
         $stmt->execute([(int)$data['id'], $userId]);
         respond(['ok' => true]);
+    }
+
+    if ($action === 'patients.list') {
+        $stmt = $pdo->prepare('SELECT p.id,p.name,p.cpf,p.birth_date,COUNT(a.id) AS appointments FROM patients p INNER JOIN appointments a ON a.patient_id=p.id AND a.user_id=p.user_id WHERE p.user_id=? GROUP BY p.id ORDER BY p.name,p.id');
+        $stmt->execute([$userId]);
+        respond(['ok' => true, 'items' => $stmt->fetchAll()]);
+    }
+    if ($action === 'patients.save' || $action === 'appointments.save') {
+        $name = trim((string)($data['name'] ?? ''));
+        $cpf = preg_replace('/\D/', '', (string)($data['cpf'] ?? ''));
+        $birth = (string)($data['birth_date'] ?? '');
+        $birthDate = DateTimeImmutable::createFromFormat('!Y-m-d', $birth);
+        if (mb_strlen($name) < 3 || mb_strlen($name) > 180 || !preg_match('/^\d{11}$/', $cpf) || !$birthDate || $birthDate->format('Y-m-d') !== $birth || $birthDate > new DateTimeImmutable('today')) {
+            respond(['ok' => false, 'error' => 'Informe nome completo, CPF com 11 dígitos e data de nascimento válida.'], 422);
+        }
+        if ($action === 'appointments.save') {
+            $placeId = (int)($data['place_id'] ?? 0);
+            $stmt = $pdo->prepare('SELECT id FROM places WHERE id=? AND user_id=?');
+            $stmt->execute([$placeId, $userId]);
+            if (!$stmt->fetch()) respond(['ok' => false, 'error' => 'Local de atendimento inválido.'], 422);
+            $type = (string)($data['document_type'] ?? '');
+            $title = trim((string)($data['document_title'] ?? ''));
+            $text = trim((string)($data['document_text'] ?? ''));
+            $date = (string)($data['document_date'] ?? '');
+            $documentDate = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+            if (!in_array($type, ['simples','especial','atestado','laudo','fisioterapia','exame'], true) || $title === '' || mb_strlen($title) > 180 || $text === '' || !$documentDate || $documentDate->format('Y-m-d') !== $date) {
+                respond(['ok' => false, 'error' => 'Preencha o tipo, texto e data do documento.'], 422);
+            }
+        }
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('INSERT INTO patients (user_id,name,cpf,birth_date) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),birth_date=VALUES(birth_date),id=LAST_INSERT_ID(id)');
+        $stmt->execute([$userId,$name,$cpf,$birth]);
+        $patientId = (int)$pdo->lastInsertId();
+        if ($action === 'appointments.save') {
+            $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,document_type,document_title,document_text,document_date) VALUES (?,?,?,?,?,?,?)');
+            $stmt->execute([$userId,$patientId,$placeId,$type,$title,$text,$date]);
+            $appointmentId = (int)$pdo->lastInsertId();
+        }
+        $pdo->commit();
+        respond(['ok' => true, 'patient_id' => $patientId, 'appointment_id' => $appointmentId ?? null]);
     }
 
     if ($action === 'models.list') {
