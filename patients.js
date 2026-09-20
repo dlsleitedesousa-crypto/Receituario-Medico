@@ -51,7 +51,8 @@
   const registrationData = () => ({
     name: document.querySelector('#newPatientName').value.trim(),
     cpf: document.querySelector('#newPatientCpf').value.replace(/\D/g, ''),
-    birth_date: document.querySelector('#newPatientBirthDate').value
+    birth_date: document.querySelector('#newPatientBirthDate').value,
+    phone: document.querySelector('#newPatientPhone').value.trim()
   });
   document.querySelector('#newPatientCpf').addEventListener('input', event => {
     const digits = event.target.value.replace(/\D/g, '').slice(0, 11);
@@ -70,7 +71,7 @@
   const showHistory = async patient => {
     detail.classList.remove('hidden');
     document.querySelector('#patientDetailName').textContent = patient.name;
-    document.querySelector('#patientDetailData').textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)}`;
+    document.querySelector('#patientDetailData').textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)}${patient.phone ? ` · Telefone ${patient.phone}` : ''}`;
     history.textContent = 'Carregando atendimentos...';
     detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
     try {
@@ -119,7 +120,7 @@
       const title = document.createElement('strong');
       title.textContent = patient.name;
       const details = document.createElement('small');
-      details.textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)} · ${patient.appointments} atendimento(s)`;
+      details.textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)}${patient.phone ? ` · Telefone ${patient.phone}` : ''} · ${patient.appointments} atendimento(s)`;
       info.append(title, details);
       const historyButton = document.createElement('button');
       historyButton.type = 'button';
@@ -135,6 +136,7 @@
         document.querySelector('#newPatientName').value = patient.name;
         document.querySelector('#newPatientCpf').value = formatCpf(patient.cpf);
         document.querySelector('#newPatientBirthDate').value = patient.birth_date;
+        document.querySelector('#newPatientPhone').value = patient.phone || '';
         registrationHeading.textContent = `Editar paciente: ${patient.name}`;
         registrationButton.textContent = 'Salvar alterações';
         cancelEditButton.classList.remove('hidden');

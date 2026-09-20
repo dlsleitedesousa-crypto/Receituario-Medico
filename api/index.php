@@ -100,10 +100,14 @@ try {
         name VARCHAR(180) NOT NULL,
         cpf CHAR(11) NOT NULL,
         birth_date DATE NOT NULL,
+        phone VARCHAR(30) NOT NULL DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uq_patient_user_cpf (user_id, cpf),
         INDEX idx_patients_user_name (user_id, name)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    if (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'phone'")->fetch()) {
+        $pdo->exec("ALTER TABLE patients ADD COLUMN phone VARCHAR(30) NOT NULL DEFAULT '' AFTER birth_date");
+    }
     $schemaTable = 'appointments';
     $pdo->exec("CREATE TABLE IF NOT EXISTS appointments (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -224,13 +228,13 @@ try {
     }
 
     if ($action === 'patients.list') {
-        $stmt = $pdo->prepare('SELECT p.id,p.name,p.cpf,p.birth_date,COUNT(a.id) AS appointments FROM patients p LEFT JOIN appointments a ON a.patient_id=p.id AND a.user_id=p.user_id WHERE p.user_id=? GROUP BY p.id ORDER BY p.name,p.id');
+        $stmt = $pdo->prepare('SELECT p.id,p.name,p.cpf,p.birth_date,p.phone,COUNT(a.id) AS appointments FROM patients p LEFT JOIN appointments a ON a.patient_id=p.id AND a.user_id=p.user_id WHERE p.user_id=? GROUP BY p.id ORDER BY p.name,p.id');
         $stmt->execute([$userId]);
         respond(['ok' => true, 'items' => $stmt->fetchAll()]);
     }
     if ($action === 'patients.history') {
         $patientId = (int)($data['id'] ?? 0);
-        $stmt = $pdo->prepare('SELECT id,name,cpf,birth_date FROM patients WHERE id=? AND user_id=?');
+        $stmt = $pdo->prepare('SELECT id,name,cpf,birth_date,phone FROM patients WHERE id=? AND user_id=?');
         $stmt->execute([$patientId,$userId]);
         $patient = $stmt->fetch();
         if (!$patient) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
@@ -242,17 +246,19 @@ try {
         $name = trim((string)($data['name'] ?? ''));
         $cpf = preg_replace('/\D/', '', (string)($data['cpf'] ?? ''));
         $birth = (string)($data['birth_date'] ?? '');
+        $phone = trim((string)($data['phone'] ?? ''));
         $birthDate = DateTimeImmutable::createFromFormat('!Y-m-d', $birth);
         if (mb_strlen($name) < 3 || mb_strlen($name) > 180 || !preg_match('/^\d{11}$/', $cpf) || !$birthDate || $birthDate->format('Y-m-d') !== $birth || $birthDate > new DateTimeImmutable('today')) {
             respond(['ok' => false, 'error' => 'Informe nome completo, CPF com 11 dígitos e data de nascimento válida.'], 422);
         }
+        if (mb_strlen($phone) > 30) respond(['ok' => false, 'error' => 'O telefone deve ter no máximo 30 caracteres.'], 422);
         if ($action === 'patients.update') {
             $patientId = (int)($data['id'] ?? 0);
             $stmt = $pdo->prepare('SELECT id FROM patients WHERE id=? AND user_id=?');
             $stmt->execute([$patientId, $userId]);
             if (!$stmt->fetch()) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
-            $stmt = $pdo->prepare('UPDATE patients SET name=?,cpf=?,birth_date=? WHERE id=? AND user_id=?');
-            $stmt->execute([$name, $cpf, $birth, $patientId, $userId]);
+            $stmt = $pdo->prepare('UPDATE patients SET name=?,cpf=?,birth_date=?,phone=? WHERE id=? AND user_id=?');
+            $stmt->execute([$name, $cpf, $birth, $phone, $patientId, $userId]);
             respond(['ok' => true, 'patient_id' => $patientId]);
         }
         if ($action === 'appointments.save') {
@@ -271,9 +277,9 @@ try {
         }
         $pdo->beginTransaction();
         $stmt = $pdo->prepare($action === 'patients.save'
-            ? 'INSERT INTO patients (user_id,name,cpf,birth_date) VALUES (?,?,?,?)'
-            : 'INSERT INTO patients (user_id,name,cpf,birth_date) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),birth_date=VALUES(birth_date),id=LAST_INSERT_ID(id)');
-        $stmt->execute([$userId,$name,$cpf,$birth]);
+            ? 'INSERT INTO patients (user_id,name,cpf,birth_date,phone) VALUES (?,?,?,?,?)'
+            : 'INSERT INTO patients (user_id,name,cpf,birth_date,phone) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),birth_date=VALUES(birth_date),id=LAST_INSERT_ID(id)');
+        $stmt->execute([$userId,$name,$cpf,$birth,$phone]);
         $patientId = (int)$pdo->lastInsertId();
         if ($action === 'appointments.save') {
             $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,document_type,document_title,document_text,document_date) VALUES (?,?,?,?,?,?,?)');
