@@ -69,9 +69,80 @@
   };
   const formatDate = value => String(value || '').slice(0, 10).split('-').reverse().join('/');
   const formatCpf = value => String(value || '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const createHistoryCard = item => {
+    const card = document.createElement('article');
+    card.className = 'history-card';
+    const heading = document.createElement('h4');
+    heading.textContent = item.document_title;
+    const meta = document.createElement('small');
+    meta.textContent = `Data: ${formatDate(item.document_date)} · Local de atendimento: ${item.place_name || 'Não disponível'}`;
+    const content = document.createElement('pre');
+    content.textContent = item.document_text;
+    card.append(heading, meta, content);
+    return card;
+  };
   const patientNameInput = document.querySelector('#patientName');
   const patientCpfInput = document.querySelector('#patientDoc');
   const patientBirthInput = document.querySelector('#patientBirthDate');
+  const historyButton = document.createElement('button');
+  historyButton.type = 'button';
+  historyButton.className = 'btn outline';
+  historyButton.textContent = 'Histórico de atendimentos';
+  document.querySelector('#openPrintSummary').before(historyButton);
+  const historyOverlay = document.createElement('section');
+  historyOverlay.className = 'patient-history-overlay hidden';
+  historyOverlay.setAttribute('role', 'dialog');
+  historyOverlay.setAttribute('aria-modal', 'true');
+  historyOverlay.setAttribute('aria-labelledby', 'currentPatientHistoryTitle');
+  const historyPanel = document.createElement('div');
+  historyPanel.className = 'patient-history-panel';
+  const historyHeading = document.createElement('div');
+  historyHeading.className = 'patient-detail-head';
+  const historyTitle = document.createElement('h2');
+  historyTitle.id = 'currentPatientHistoryTitle';
+  historyTitle.textContent = 'Histórico de atendimentos';
+  const closeHistoryButton = document.createElement('button');
+  closeHistoryButton.type = 'button';
+  closeHistoryButton.className = 'btn outline';
+  closeHistoryButton.textContent = 'Fechar';
+  historyHeading.append(historyTitle, closeHistoryButton);
+  const historyPatient = document.createElement('p');
+  const currentHistoryList = document.createElement('div');
+  currentHistoryList.className = 'history-list';
+  historyPanel.append(historyHeading, historyPatient, currentHistoryList);
+  historyOverlay.append(historyPanel);
+  document.body.append(historyOverlay);
+  const closeCurrentHistory = () => historyOverlay.classList.add('hidden');
+  closeHistoryButton.onclick = closeCurrentHistory;
+  historyOverlay.onclick = event => { if (event.target === historyOverlay) closeCurrentHistory(); };
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !historyOverlay.classList.contains('hidden')) closeCurrentHistory();
+  });
+  ['#backPlaces', '#logoutRx', '#clearPatient', '#printRx'].forEach(selector => {
+    document.querySelector(selector).addEventListener('click', closeCurrentHistory);
+  });
+  historyButton.onclick = async () => {
+    const cpf = patientCpfInput.value.replace(/\D/g, '');
+    if (cpf.length !== 11) { toast('Selecione um paciente cadastrado para ver o histórico.'); patientNameInput.focus(); return; }
+    historyButton.disabled = true;
+    try {
+      await load();
+      const patient = patients.find(item => item.cpf === cpf);
+      if (!patient) { toast('Paciente não encontrado no cadastro.'); return; }
+      historyPatient.textContent = `${patient.name} · CPF ${formatCpf(patient.cpf)}`;
+      currentHistoryList.textContent = 'Carregando atendimentos...';
+      historyOverlay.classList.remove('hidden');
+      closeHistoryButton.focus();
+      const result = await request('patients.history', { id: patient.id });
+      currentHistoryList.replaceChildren();
+      if (!result.items.length) {
+        const empty = document.createElement('p');
+        empty.textContent = 'Nenhum atendimento salvo para este paciente.';
+        currentHistoryList.append(empty);
+      } else result.items.forEach(item => currentHistoryList.append(createHistoryCard(item)));
+    } catch (error) { closeCurrentHistory(); notifyError(error); }
+    finally { historyButton.disabled = false; }
+  };
   const suggestions = document.createElement('div');
   suggestions.id = 'patientSuggestions';
   suggestions.className = 'patient-suggestions hidden';
@@ -190,18 +261,7 @@
         history.append(empty);
         return;
       }
-      result.items.forEach(item => {
-        const card = document.createElement('article');
-        card.className = 'history-card';
-        const heading = document.createElement('h4');
-        heading.textContent = item.document_title;
-        const meta = document.createElement('small');
-        meta.textContent = `Data: ${formatDate(item.document_date)} · Local de atendimento: ${item.place_name || 'Não disponível'}`;
-        const content = document.createElement('pre');
-        content.textContent = item.document_text;
-        card.append(heading, meta, content);
-        history.append(card);
-      });
+      result.items.forEach(item => history.append(createHistoryCard(item)));
     } catch (error) { history.textContent = ''; notifyError(error); }
   };
   document.querySelector('#closePatientDetail').onclick = () => detail.classList.add('hidden');
