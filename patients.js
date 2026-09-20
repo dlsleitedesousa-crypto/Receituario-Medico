@@ -33,6 +33,7 @@
   patientsTab.onclick = () => { selectTab('patients'); load().catch(notifyError); };
   document.querySelector('#backFromPatients').onclick = () => selectTab('places');
   let patients = [];
+  let patientsLoaded = false;
   const request = async (action, data = {}) => {
     const response = await fetch(`api/index.php?action=${encodeURIComponent(action)}`, {
       method: 'POST', credentials: 'same-origin',
@@ -68,6 +69,112 @@
   };
   const formatDate = value => String(value || '').slice(0, 10).split('-').reverse().join('/');
   const formatCpf = value => String(value || '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const patientNameInput = document.querySelector('#patientName');
+  const patientCpfInput = document.querySelector('#patientDoc');
+  const patientBirthInput = document.querySelector('#patientBirthDate');
+  const suggestions = document.createElement('div');
+  suggestions.id = 'patientSuggestions';
+  suggestions.className = 'patient-suggestions hidden';
+  suggestions.setAttribute('role', 'listbox');
+  suggestions.setAttribute('aria-label', 'Pacientes cadastrados');
+  const patientNameField = patientNameInput.closest('.field');
+  const lookupContainer = document.createElement('div');
+  lookupContainer.className = 'patient-lookup';
+  patientNameField.before(lookupContainer);
+  lookupContainer.append(patientNameField, suggestions);
+  patientNameInput.setAttribute('autocomplete', 'off');
+  patientNameInput.setAttribute('role', 'combobox');
+  patientNameInput.setAttribute('aria-autocomplete', 'list');
+  patientNameInput.setAttribute('aria-controls', suggestions.id);
+  patientNameInput.setAttribute('aria-expanded', 'false');
+  let selectedPatientId = null;
+  let suggestedPatients = [];
+  let activeSuggestion = -1;
+  const foldName = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const hideSuggestions = () => {
+    suggestions.classList.add('hidden');
+    patientNameInput.setAttribute('aria-expanded', 'false');
+    patientNameInput.removeAttribute('aria-activedescendant');
+    activeSuggestion = -1;
+  };
+  const choosePatient = patient => {
+    patientNameInput.value = patient.name;
+    patientCpfInput.value = formatCpf(patient.cpf);
+    patientBirthInput.value = patient.birth_date;
+    selectedPatientId = patient.id;
+    patientNameInput.focus();
+    hideSuggestions();
+  };
+  const highlightSuggestion = index => {
+    activeSuggestion = index;
+    [...suggestions.children].forEach((option, optionIndex) => {
+      option.setAttribute('aria-selected', String(optionIndex === index));
+    });
+    const active = suggestions.children[index];
+    if (active) {
+      patientNameInput.setAttribute('aria-activedescendant', active.id);
+      active.scrollIntoView({ block: 'nearest' });
+    }
+  };
+  const renderSuggestions = () => {
+    const query = foldName(patientNameInput.value.trim());
+    suggestions.replaceChildren();
+    if (!query) { hideSuggestions(); return; }
+    suggestedPatients = patients.filter(patient => foldName(patient.name).includes(query)).slice(0, 8);
+    if (!suggestedPatients.length) { hideSuggestions(); return; }
+    suggestedPatients.forEach((patient, index) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.id = `patientSuggestion${index}`;
+      option.className = 'patient-suggestion';
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', 'false');
+      const name = document.createElement('strong');
+      name.textContent = patient.name;
+      const cpf = document.createElement('small');
+      cpf.textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)}`;
+      option.append(name, cpf);
+      option.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        choosePatient(patient);
+      });
+      option.onclick = () => choosePatient(patient);
+      suggestions.append(option);
+    });
+    suggestions.classList.remove('hidden');
+    patientNameInput.setAttribute('aria-expanded', 'true');
+    activeSuggestion = -1;
+    patientNameInput.removeAttribute('aria-activedescendant');
+  };
+  patientNameInput.addEventListener('input', () => {
+    if (selectedPatientId !== null) {
+      patientCpfInput.value = '';
+      patientBirthInput.value = '';
+      selectedPatientId = null;
+    }
+    renderSuggestions();
+  });
+  patientNameInput.addEventListener('focus', () => {
+    if (patientsLoaded) renderSuggestions();
+    else load().catch(notifyError);
+  });
+  patientNameInput.addEventListener('keydown', event => {
+    if (suggestions.classList.contains('hidden')) return;
+    if (event.key === 'Escape') { hideSuggestions(); return; }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      highlightSuggestion((activeSuggestion + step + suggestedPatients.length) % suggestedPatients.length);
+    }
+    if (event.key === 'Enter' && activeSuggestion >= 0) {
+      event.preventDefault();
+      choosePatient(suggestedPatients[activeSuggestion]);
+    }
+  });
+  document.addEventListener('click', event => {
+    if (!lookupContainer.contains(event.target)) hideSuggestions();
+  });
+  document.querySelector('#clearPatient').addEventListener('click', () => { selectedPatientId = null; hideSuggestions(); });
   const showHistory = async patient => {
     detail.classList.remove('hidden');
     document.querySelector('#patientDetailName').textContent = patient.name;
@@ -148,9 +255,7 @@
       button.className = 'btn outline';
       button.textContent = 'Usar paciente';
       button.onclick = () => {
-        document.querySelector('#patientName').value = patient.name;
-        document.querySelector('#patientDoc').value = formatCpf(patient.cpf);
-        document.querySelector('#patientBirthDate').value = patient.birth_date;
+        choosePatient(patient);
         selectTab('places');
         toast('Paciente selecionado. Clique em “Atender” no local desejado.');
       };
@@ -180,7 +285,12 @@
       list.append(row);
     });
   };
-  const load = async () => { patients = (await request('patients.list')).items; render(); };
+  const load = async () => {
+    patients = (await request('patients.list')).items;
+    patientsLoaded = true;
+    render();
+    if (document.activeElement === patientNameInput) renderSuggestions();
+  };
   search.addEventListener('input', render);
   registrationForm.onsubmit = async event => {
     event.preventDefault();
@@ -226,6 +336,6 @@
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
-  document.addEventListener('patients:load', () => { stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
+  document.addEventListener('patients:load', () => { patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();
