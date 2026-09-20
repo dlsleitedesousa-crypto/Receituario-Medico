@@ -7,6 +7,23 @@
   const placesTab = document.querySelector('#placesTab');
   const patientsTab = document.querySelector('#patientsTab');
   const patientsPanel = document.querySelector('#patientsPanel');
+  const registrationForm = document.querySelector('#patientRegistrationForm');
+  const registrationHeading = registrationForm.querySelector('h2');
+  const registrationButton = document.querySelector('#registerPatientButton');
+  const cancelEditButton = document.createElement('button');
+  cancelEditButton.type = 'button';
+  cancelEditButton.className = 'btn outline hidden';
+  cancelEditButton.textContent = 'Cancelar edição';
+  registrationButton.before(cancelEditButton);
+  let editingPatientId = null;
+  const stopEditing = () => {
+    editingPatientId = null;
+    registrationForm.reset();
+    registrationHeading.textContent = 'Cadastrar paciente';
+    registrationButton.textContent = 'Cadastrar paciente';
+    cancelEditButton.classList.add('hidden');
+  };
+  cancelEditButton.onclick = stopEditing;
   document.querySelector('#patientDirectoryHost').append(patientsPanel);
   patientsPanel.classList.remove('hidden');
   const selectTab = target => {
@@ -109,6 +126,21 @@
       historyButton.className = 'btn blue';
       historyButton.textContent = 'Ver histórico';
       historyButton.onclick = () => showHistory(patient);
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'btn outline';
+      editButton.textContent = 'Editar';
+      editButton.onclick = () => {
+        editingPatientId = patient.id;
+        document.querySelector('#newPatientName').value = patient.name;
+        document.querySelector('#newPatientCpf').value = formatCpf(patient.cpf);
+        document.querySelector('#newPatientBirthDate').value = patient.birth_date;
+        registrationHeading.textContent = `Editar paciente: ${patient.name}`;
+        registrationButton.textContent = 'Salvar alterações';
+        cancelEditButton.classList.remove('hidden');
+        registrationForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelector('#newPatientName').focus();
+      };
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'btn outline';
@@ -122,27 +154,29 @@
       };
       const actions = document.createElement('div');
       actions.className = 'patient-row-actions';
-      actions.append(historyButton, button);
+      actions.append(historyButton, editButton, button);
       row.append(info, actions);
       list.append(row);
     });
   };
   const load = async () => { patients = (await request('patients.list')).items; render(); };
   search.addEventListener('input', render);
-  document.querySelector('#patientRegistrationForm').onsubmit = async event => {
+  registrationForm.onsubmit = async event => {
     event.preventDefault();
     const data = registrationData();
     if (data.name.split(/\s+/).length < 2 || data.cpf.length !== 11 || patientAge(data.birth_date) === null) {
       toast('Informe nome completo, CPF com 11 dígitos e data de nascimento válida.');
       return;
     }
-    const button = document.querySelector('#registerPatientButton');
+    const button = registrationButton;
     button.disabled = true;
     try {
-      await request('patients.save', data);
-      event.target.reset();
+      const wasEditing = editingPatientId !== null;
+      await request(wasEditing ? 'patients.update' : 'patients.save', wasEditing ? { ...data, id: editingPatientId } : data);
+      stopEditing();
       await load();
-      toast('Paciente cadastrado.');
+      detail.classList.add('hidden');
+      toast(wasEditing ? 'Dados do paciente atualizados.' : 'Paciente cadastrado.');
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
@@ -171,6 +205,6 @@
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
-  document.addEventListener('patients:load', () => { detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
+  document.addEventListener('patients:load', () => { stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();

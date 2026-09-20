@@ -238,13 +238,22 @@ try {
         $stmt->execute([$patientId,$userId]);
         respond(['ok' => true, 'patient' => $patient, 'items' => $stmt->fetchAll()]);
     }
-    if ($action === 'patients.save' || $action === 'appointments.save') {
+    if (in_array($action, ['patients.save', 'patients.update', 'appointments.save'], true)) {
         $name = trim((string)($data['name'] ?? ''));
         $cpf = preg_replace('/\D/', '', (string)($data['cpf'] ?? ''));
         $birth = (string)($data['birth_date'] ?? '');
         $birthDate = DateTimeImmutable::createFromFormat('!Y-m-d', $birth);
         if (mb_strlen($name) < 3 || mb_strlen($name) > 180 || !preg_match('/^\d{11}$/', $cpf) || !$birthDate || $birthDate->format('Y-m-d') !== $birth || $birthDate > new DateTimeImmutable('today')) {
             respond(['ok' => false, 'error' => 'Informe nome completo, CPF com 11 dígitos e data de nascimento válida.'], 422);
+        }
+        if ($action === 'patients.update') {
+            $patientId = (int)($data['id'] ?? 0);
+            $stmt = $pdo->prepare('SELECT id FROM patients WHERE id=? AND user_id=?');
+            $stmt->execute([$patientId, $userId]);
+            if (!$stmt->fetch()) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
+            $stmt = $pdo->prepare('UPDATE patients SET name=?,cpf=?,birth_date=? WHERE id=? AND user_id=?');
+            $stmt->execute([$name, $cpf, $birth, $patientId, $userId]);
+            respond(['ok' => true, 'patient_id' => $patientId]);
         }
         if ($action === 'appointments.save') {
             $placeId = (int)($data['place_id'] ?? 0);
@@ -261,7 +270,9 @@ try {
             }
         }
         $pdo->beginTransaction();
-        $stmt = $pdo->prepare('INSERT INTO patients (user_id,name,cpf,birth_date) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),birth_date=VALUES(birth_date),id=LAST_INSERT_ID(id)');
+        $stmt = $pdo->prepare($action === 'patients.save'
+            ? 'INSERT INTO patients (user_id,name,cpf,birth_date) VALUES (?,?,?,?)'
+            : 'INSERT INTO patients (user_id,name,cpf,birth_date) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),birth_date=VALUES(birth_date),id=LAST_INSERT_ID(id)');
         $stmt->execute([$userId,$name,$cpf,$birth]);
         $patientId = (int)$pdo->lastInsertId();
         if ($action === 'appointments.save') {
@@ -299,7 +310,7 @@ try {
 
     respond(['ok' => false, 'error' => 'Ação inválida.'], 404);
 } catch (PDOException $e) {
-    if ((int)$e->errorInfo[1] === 1062) respond(['ok' => false, 'error' => 'Este e-mail já está cadastrado.'], 409);
+    if ((int)$e->errorInfo[1] === 1062) respond(['ok' => false, 'error' => str_starts_with($action, 'patients.') ? 'Este CPF já está cadastrado. Use o botão Editar na lista de pacientes.' : 'Este e-mail já está cadastrado.'], 409);
     respond(['ok' => false, 'error' => 'Não foi possível concluir a operação.'], 500);
 } catch (Throwable $e) {
     respond(['ok' => false, 'error' => 'Erro interno.'], 500);
