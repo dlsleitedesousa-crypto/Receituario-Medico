@@ -7,8 +7,10 @@
   form.setAttribute('role', 'dialog');
   form.setAttribute('aria-modal', 'true');
   form.setAttribute('aria-labelledby', 'apacEditorTitle');
-  form.innerHTML = `<form class="apac-editor-panel" id="apacForm">
+  form.innerHTML = `<div class="apac-editor-panel">
     <div class="apac-editor-head"><div><h2 id="apacEditorTitle">Criar APAC</h2><p>Laudo para solicitação/autorização de procedimentos ambulatoriais do SUS</p></div><button class="btn outline" type="button" id="closeApac">Fechar</button></div>
+    <div class="apac-workspace"><aside class="apac-models" aria-label="Modelos de APAC salvos"><h3>Modelos salvos</h3><label class="field"><span>Pesquisar modelo</span><input id="apacModelSearch" type="search" placeholder="Digite o nome do modelo"></label><div id="apacModelList" class="apac-model-list" role="list"></div></aside>
+    <form id="apacForm" class="apac-form"><label class="field apac-model-name"><span>Nome do modelo</span><input id="apacModelName" maxlength="180" placeholder="Ex.: Consulta de acompanhamento"></label>
     <div class="apac-fields">
       <label class="field apac-lookup"><span>Procedimento APAC principal</span><input id="apacProcedure" required autocomplete="off" placeholder="Buscar por nome ou código SIGTAP"><div class="apac-suggestions hidden" id="apacProcedureSuggestions"></div></label>
       <label class="field"><span>Código SIGTAP</span><input id="apacCode" inputmode="numeric" maxlength="10" readonly></label>
