@@ -72,18 +72,18 @@ async function createApacTemplatePdf(values, templateBytes, PDFLib) {
     const center = 42.5 + index * 17.6;
     page.drawText(digit, { x: center - font.widthOfTextAtSize(digit, 9) / 2, y: 539, size: 9, font, color });
   });
-  const dateParts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(values.date || ''));
-  if (!dateParts) throw new Error('Data da solicitação inválida');
-  [
-    { value: dateParts[1], center: 309.5 },
-    { value: dateParts[2], center: 334 },
-    { value: dateParts[3], center: 362 }
-  ].forEach(({ value, center }) => page.drawText(value, {
-    x: center - font.widthOfTextAtSize(value, 9) / 2, y: 211, size: 9, font, color
-  }));
+  const drawDate = (value, centers, y, label) => {
+    if (!value) return;
+    const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value));
+    if (!parts) throw new Error(`${label} inválida`);
+    parts.slice(1).forEach((part, index) => page.drawText(part, {
+      x: centers[index] - font.widthOfTextAtSize(part, 9) / 2, y, size: 9, font, color
+    }));
+  };
+  drawDate(values.date, [309.5, 334, 362], 211, 'Data da solicitação');
+  drawDate(values.birthDate, [317, 342, 372], 676, 'Data de nascimento');
   fit(values.cnes, 495, 739, 60, 9);
   fit(values.patient, 36, 700, 423, 9);
-  fit(values.birthDate, 310, 676, 78, 9);
   fit(values.quantity, 508, 539, 43, 9);
   wrapped(values.diagnosis, 36, 348, 291, 8, 2, 9);
   fit(values.cid, 337, 347, 52, 9);
@@ -113,7 +113,7 @@ async function openApacTemplatePdf(values) {
   viewer.document.title = 'Preparando APAC';
   viewer.document.body.textContent = 'Preparando PDF da APAC…';
   try {
-    const [library, response] = await Promise.all([loadApacPdfLibrary(), fetch('assets/apac-modelo.pdf?v=20260920')]);
+    const [library, response] = await Promise.all([loadApacPdfLibrary(), fetch('assets/apac-modelo.pdf?v=20260920-birth')]);
     if (!response.ok) throw new Error('Modelo APAC indisponível');
     const bytes = await createApacTemplatePdf(values, await response.arrayBuffer(), library);
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
