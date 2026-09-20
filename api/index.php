@@ -114,6 +114,7 @@ try {
         user_id BIGINT UNSIGNED NOT NULL,
         patient_id BIGINT UNSIGNED NOT NULL,
         place_id BIGINT UNSIGNED NOT NULL,
+        place_name VARCHAR(180) NOT NULL DEFAULT '',
         document_type VARCHAR(30) NOT NULL,
         document_title VARCHAR(180) NOT NULL,
         document_text MEDIUMTEXT NOT NULL,
@@ -122,6 +123,10 @@ try {
         INDEX idx_appointments_patient (user_id, patient_id, created_at),
         INDEX idx_appointments_place (user_id, place_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    if (!$pdo->query("SHOW COLUMNS FROM appointments LIKE 'place_name'")->fetch()) {
+        $pdo->exec("ALTER TABLE appointments ADD COLUMN place_name VARCHAR(180) NOT NULL DEFAULT '' AFTER place_id");
+        $pdo->exec("UPDATE appointments a JOIN places p ON p.id=a.place_id AND p.user_id=a.user_id SET a.place_name=p.name WHERE a.place_name=''");
+    }
 } catch (Throwable $e) {
     error_log('Flow Receita schema [' . ($schemaTable ?? 'unknown') . ']: ' . $e->getMessage());
     $mysqlCode = ($e instanceof PDOException && isset($e->errorInfo[1])) ? (string)$e->errorInfo[1] : 'SQL';
@@ -238,7 +243,7 @@ try {
         $stmt->execute([$patientId,$userId]);
         $patient = $stmt->fetch();
         if (!$patient) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
-        $stmt = $pdo->prepare('SELECT a.id,a.document_type,a.document_title,a.document_text,a.document_date,a.created_at,p.name AS place_name FROM appointments a LEFT JOIN places p ON p.id=a.place_id AND p.user_id=a.user_id WHERE a.patient_id=? AND a.user_id=? ORDER BY a.created_at DESC,a.id DESC');
+        $stmt = $pdo->prepare("SELECT a.id,a.document_type,a.document_title,a.document_text,a.document_date,a.created_at,COALESCE(NULLIF(a.place_name,''),p.name) AS place_name FROM appointments a LEFT JOIN places p ON p.id=a.place_id AND p.user_id=a.user_id WHERE a.patient_id=? AND a.user_id=? ORDER BY a.created_at DESC,a.id DESC");
         $stmt->execute([$patientId,$userId]);
         respond(['ok' => true, 'patient' => $patient, 'items' => $stmt->fetchAll()]);
     }
@@ -279,9 +284,10 @@ try {
         }
         if ($action === 'appointments.save') {
             $placeId = (int)($data['place_id'] ?? 0);
-            $stmt = $pdo->prepare('SELECT id FROM places WHERE id=? AND user_id=?');
+            $stmt = $pdo->prepare('SELECT id,name FROM places WHERE id=? AND user_id=?');
             $stmt->execute([$placeId, $userId]);
-            if (!$stmt->fetch()) respond(['ok' => false, 'error' => 'Local de atendimento inválido.'], 422);
+            $place = $stmt->fetch();
+            if (!$place) respond(['ok' => false, 'error' => 'Local de atendimento inválido.'], 422);
             $type = (string)($data['document_type'] ?? '');
             $title = trim((string)($data['document_title'] ?? ''));
             $text = trim((string)($data['document_text'] ?? ''));
@@ -298,8 +304,8 @@ try {
         $stmt->execute([$userId,$name,$cpf,$birth,$phone]);
         $patientId = (int)$pdo->lastInsertId();
         if ($action === 'appointments.save') {
-            $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,document_type,document_title,document_text,document_date) VALUES (?,?,?,?,?,?,?)');
-            $stmt->execute([$userId,$patientId,$placeId,$type,$title,$text,$date]);
+            $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,place_name,document_type,document_title,document_text,document_date) VALUES (?,?,?,?,?,?,?,?)');
+            $stmt->execute([$userId,$patientId,$placeId,$place['name'],$type,$title,$text,$date]);
             $appointmentId = (int)$pdo->lastInsertId();
         }
         $pdo->commit();

@@ -89,7 +89,7 @@
         const heading = document.createElement('h4');
         heading.textContent = item.document_title;
         const meta = document.createElement('small');
-        meta.textContent = `${formatDate(item.document_date)} · ${item.place_name || 'Local removido'}`;
+        meta.textContent = `Data: ${formatDate(item.document_date)} · Local de atendimento: ${item.place_name || 'Não disponível'}`;
         const content = document.createElement('pre');
         content.textContent = item.document_text;
         card.append(heading, meta, content);
