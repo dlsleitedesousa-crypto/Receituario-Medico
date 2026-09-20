@@ -18,6 +18,7 @@
   $('#profileForm').onsubmit = async event => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
+    if (!validDoctorCpf($('#profileCpf').value)) { toast('Informe um CPF válido.'); $('#profileCpf').focus(); return; }
     const button = $('#saveProfile');
     button.disabled = true;
     try {
@@ -48,10 +49,13 @@
   };
   $('#registerForm').onsubmit = async event => {
     event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+    if (!validDoctorCpf($('#doctorCpf').value)) { toast('Informe um CPF válido.'); $('#doctorCpf').focus(); return; }
     try {
       await api('register', {
         title: $('#doctorTitle').value,
         name: $('#doctorName').value.trim(),
+        cpf: doctorCpfDigits($('#doctorCpf').value),
         specialty: $('#doctorSpecialty').value.trim(),
         crm: $('#doctorCrm').value.trim(),
         rqe: $('#doctorRqe').value.trim(),

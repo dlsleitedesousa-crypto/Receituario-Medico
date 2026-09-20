@@ -89,6 +89,13 @@ async function createApacTemplatePdf(values, templateBytes, PDFLib) {
   fit(values.cid, 337, 347, 52, 9);
   wrapped(values.notes, 36, 315, 515, 9, 7, 10);
   fit(values.professional, 36, 211, 248, 9);
+  const professionalCpf = String(values.professionalCpf || '').replace(/\D/g, '');
+  if (!/^\d{11}$/.test(professionalCpf)) throw new Error('Cadastre o CPF do médico em Meu perfil para gerar a APAC');
+  page.drawText('X', { x: 104, y: 187, size: 8, font, color });
+  [...professionalCpf].forEach((digit, index) => {
+    const center = 152.5 + index * 15.5;
+    page.drawText(digit, { x: center - font.widthOfTextAtSize(digit, 9) / 2, y: 189, size: 9, font, color });
+  });
   document.setTitle('Laudo para Solicitação/Autorização de Procedimento Ambulatorial');
   return document.save();
 }

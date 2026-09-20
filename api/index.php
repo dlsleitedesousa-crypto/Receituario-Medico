@@ -36,6 +36,17 @@ function requireUser(): int {
     return (int) $_SESSION['user_id'];
 }
 
+function validDoctorCpf(string $cpf): bool {
+    if (!preg_match('/^\d{11}$/', $cpf) || preg_match('/^(\d)\1{10}$/', $cpf)) return false;
+    for ($length = 9; $length <= 10; $length++) {
+        $sum = 0;
+        for ($index = 0; $index < $length; $index++) $sum += (int)$cpf[$index] * ($length + 1 - $index);
+        $check = ($sum * 10) % 11 % 10;
+        if ($check !== (int)$cpf[$length]) return false;
+    }
+    return true;
+}
+
 try {
     $pdo = new PDO(
         'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
@@ -60,6 +71,7 @@ try {
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(8) NOT NULL,
         name VARCHAR(180) NOT NULL,
+        cpf CHAR(11) NOT NULL DEFAULT '',
         specialty VARCHAR(180) NOT NULL,
         crm VARCHAR(80) NOT NULL,
         rqe VARCHAR(80) NOT NULL,
@@ -67,6 +79,9 @@ try {
         password_hash VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    if (!$pdo->query("SHOW COLUMNS FROM users LIKE 'cpf'")->fetch()) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN cpf CHAR(11) NOT NULL DEFAULT '' AFTER name");
+    }
     $schemaTable = 'places';
     $pdo->exec("CREATE TABLE IF NOT EXISTS places (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -146,12 +161,14 @@ try {
     if ($action === 'register') {
         $email = mb_strtolower(trim((string)($data['email'] ?? '')));
         $password = (string)($data['password'] ?? '');
+        $cpf = preg_replace('/\D/', '', (string)($data['cpf'] ?? ''));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 8) {
             respond(['ok' => false, 'error' => 'Informe um e-mail válido e senha com pelo menos 8 caracteres.'], 422);
         }
-        $stmt = $pdo->prepare('INSERT INTO users (title,name,specialty,crm,rqe,email,password_hash) VALUES (?,?,?,?,?,?,?)');
+        if (!validDoctorCpf($cpf)) respond(['ok' => false, 'error' => 'Informe um CPF válido.'], 422);
+        $stmt = $pdo->prepare('INSERT INTO users (title,name,cpf,specialty,crm,rqe,email,password_hash) VALUES (?,?,?,?,?,?,?,?)');
         $stmt->execute([
-            trim((string)$data['title']), trim((string)$data['name']), trim((string)$data['specialty']),
+            trim((string)$data['title']), trim((string)$data['name']), $cpf, trim((string)$data['specialty']),
             trim((string)$data['crm']), trim((string)$data['rqe']), $email, password_hash($password, PASSWORD_DEFAULT)
         ]);
         respond(['ok' => true]);
@@ -192,18 +209,20 @@ try {
 
     if ($action === 'profile.update') {
         $values = [];
-        foreach (['title', 'name', 'specialty', 'crm', 'rqe', 'email'] as $field) {
-            $values[$field] = trim((string)($data[$field] ?? ''));
+        foreach (['title', 'name', 'cpf', 'specialty', 'crm', 'rqe', 'email'] as $field) {
+            $values[$field] = $field === 'cpf'
+                ? preg_replace('/\D/', '', (string)($data[$field] ?? ''))
+                : trim((string)($data[$field] ?? ''));
             if ($values[$field] === '') respond(['ok' => false, 'error' => 'Preencha todos os dados do perfil.'], 422);
         }
         $values['email'] = mb_strtolower($values['email']);
-        if (!in_array($values['title'], ['Dr.', 'Dra.'], true) || !filter_var($values['email'], FILTER_VALIDATE_EMAIL)) {
-            respond(['ok' => false, 'error' => 'Informe um tratamento e e-mail válidos.'], 422);
+        if (!in_array($values['title'], ['Dr.', 'Dra.'], true) || !filter_var($values['email'], FILTER_VALIDATE_EMAIL) || !validDoctorCpf($values['cpf'])) {
+            respond(['ok' => false, 'error' => 'Informe tratamento, CPF e e-mail válidos.'], 422);
         }
-        foreach (['title' => 8, 'name' => 180, 'specialty' => 180, 'crm' => 80, 'rqe' => 80, 'email' => 190] as $field => $limit) {
+        foreach (['title' => 8, 'name' => 180, 'cpf' => 11, 'specialty' => 180, 'crm' => 80, 'rqe' => 80, 'email' => 190] as $field => $limit) {
             if (mb_strlen($values[$field]) > $limit) respond(['ok' => false, 'error' => 'O campo ' . $field . ' excede o tamanho permitido.'], 422);
         }
-        $stmt = $pdo->prepare('UPDATE users SET title=?,name=?,specialty=?,crm=?,rqe=?,email=? WHERE id=?');
+        $stmt = $pdo->prepare('UPDATE users SET title=?,name=?,cpf=?,specialty=?,crm=?,rqe=?,email=? WHERE id=?');
         $stmt->execute([...array_values($values), $userId]);
         respond(['ok' => true, 'user' => $values]);
     }

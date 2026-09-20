@@ -84,6 +84,12 @@
   $('#closeApac').onclick = close;
   form.onclick = event => { if (event.target === form) close(); };
   const open = () => {
+    if (!validDoctorCpf(doctor.cpf)) {
+      toast('Preencha seu CPF em Meu perfil antes de gerar a APAC.');
+      document.querySelector('#rxScreen .open-profile').click();
+      $('#profileCpf').focus();
+      return;
+    }
     if (!$('#patientName').value.trim()) { toast('Informe o nome do paciente antes de criar a APAC.'); $('#patientName').focus(); return; }
     form.classList.remove('hidden');
     document.body.classList.add('apac-editing');
@@ -113,7 +119,7 @@
     const values = {
       cnes: place.cnes || '', patient,
       birthDate: date($('#patientBirthDate').value), code, procedure, quantity,
-      cid, diagnosis, notes, professional: doctor.name || '',
+      cid, diagnosis, notes, professional: doctor.name || '', professionalCpf: doctor.cpf,
       date: date($('#rxDate').value || new Date().toISOString().slice(0, 10))
     };
     openApacTemplatePdf(values).then(success => {
