@@ -51,7 +51,7 @@
     box.classList.toggle('hidden', !matches.length);
   };
   const loadCatalog = () => {
-    if (!catalogPromise) catalogPromise = fetch('apac-catalog.json?v=202609', { cache: 'force-cache' })
+    if (!catalogPromise) catalogPromise = fetch('apac-catalog.json?v=202609-layout', { cache: 'force-cache' })
       .then(response => { if (!response.ok) throw new Error('Catálogo indisponível'); return response.json(); })
       .then(data => {
         if (!Array.isArray(data.procedures) || !Array.isArray(data.cids)) throw new Error('Catálogo inválido');
@@ -111,7 +111,7 @@
     const originalLabel = submit.textContent;
     submit.textContent = 'Preparando PDF…';
     const values = {
-      place: place.name || '', cnes: place.cnes || '', patient,
+      cnes: place.cnes || '', patient,
       birthDate: date($('#patientBirthDate').value), code, procedure, quantity,
       cid, diagnosis, notes, professional: doctor.name || '',
       date: date($('#rxDate').value || new Date().toISOString().slice(0, 10))

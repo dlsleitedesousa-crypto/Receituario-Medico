@@ -4,8 +4,9 @@ import { resolve } from 'node:path';
 
 const archive = process.argv[2];
 if (!archive) throw new Error('Uso: node tools/build-apac-catalog.mjs TabelaUnificada_YYYYMM.zip');
-const read = name => execFileSync('tar', ['-xOf', archive, name], { maxBuffer: 32 * 1024 * 1024 })
-  .toString('latin1').split(/\r?\n/).filter(Boolean);
+const read = name => new TextDecoder('windows-1252').decode(
+  execFileSync('tar', ['-xOf', archive, name], { maxBuffer: 32 * 1024 * 1024 })
+).split(/\r?\n/).filter(Boolean);
 const competence = read('tb_registro.txt')[0].slice(-6);
 if (!/^20\d{4}$/.test(competence)) throw new Error('Competência inválida');
 const names = new Map(read('tb_procedimento.txt').map(line => [line.slice(0, 10), line.slice(10, 260).trim()]));

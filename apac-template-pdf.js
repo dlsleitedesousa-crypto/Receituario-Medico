@@ -33,18 +33,62 @@ async function createApacTemplatePdf(values, templateBytes, PDFLib) {
     if (lines.length > maxLines) throw new Error('Reduza o texto do diagnóstico ou das observações para caber no modelo APAC');
     lines.forEach((line, index) => { if (line) page.drawText(line, { x, y: y - index * lineHeight, size, font, color }); });
   };
-  fit(values.place, 36, 739, 409, 9);
+  const procedureName = clean(values.procedure).replace(/\s+/g, ' ').trim();
+  let procedureLines;
+  let procedureSize;
+  for (let size = 8.5; size >= 6.5; size -= 0.5) {
+    const lines = [''];
+    for (const word of procedureName.split(' ')) {
+      const index = lines.length - 1;
+      const candidate = lines[index] ? `${lines[index]} ${word}` : word;
+      if (font.widthOfTextAtSize(candidate, size) <= 267) lines[index] = candidate;
+      else lines.push(word);
+    }
+    if (lines.length <= 2 && lines.every(line => font.widthOfTextAtSize(line, size) <= 267)) {
+      procedureLines = lines; procedureSize = size; break;
+    }
+  }
+  if (!procedureLines) {
+    const size = 6;
+    const lines = [''];
+    for (const word of procedureName.split(' ')) {
+      const index = lines.length - 1;
+      const candidate = lines[index] ? `${lines[index]} ${word}` : word;
+      if (font.widthOfTextAtSize(candidate, size) <= 267) lines[index] = candidate;
+      else lines.push(word);
+    }
+    if (lines.length <= 3 && lines.every(line => font.widthOfTextAtSize(line, size) <= 267)) {
+      procedureLines = lines; procedureSize = size;
+    }
+  }
+  if (!procedureLines) throw new Error('O nome do procedimento não cabe no campo do modelo APAC');
+  procedureLines.forEach((line, index) => page.drawText(line, {
+    x: 217, y: procedureLines.length === 1 ? 541 : procedureLines.length === 2 ? 547 - index * 8.5 : 549 - index * 5.5,
+    size: procedureSize, font, color
+  }));
+  const code = String(values.code || '').replace(/\D/g, '');
+  if (code.length !== 10) throw new Error('O código SIGTAP deve ter 10 dígitos');
+  [...code].forEach((digit, index) => {
+    const center = 42.5 + index * 17.6;
+    page.drawText(digit, { x: center - font.widthOfTextAtSize(digit, 9) / 2, y: 539, size: 9, font, color });
+  });
+  const dateParts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(values.date || ''));
+  if (!dateParts) throw new Error('Data da solicitação inválida');
+  [
+    { value: dateParts[1], center: 309.5 },
+    { value: dateParts[2], center: 334 },
+    { value: dateParts[3], center: 362 }
+  ].forEach(({ value, center }) => page.drawText(value, {
+    x: center - font.widthOfTextAtSize(value, 9) / 2, y: 211, size: 9, font, color
+  }));
   fit(values.cnes, 495, 739, 60, 9);
   fit(values.patient, 36, 700, 423, 9);
   fit(values.birthDate, 310, 676, 78, 9);
-  fit(values.code, 38, 539, 168, 9);
-  wrapped(values.procedure, 217, 542, 269, 8, 2, 9);
   fit(values.quantity, 508, 539, 43, 9);
   wrapped(values.diagnosis, 36, 348, 291, 8, 2, 9);
   fit(values.cid, 337, 347, 52, 9);
   wrapped(values.notes, 36, 315, 515, 9, 7, 10);
   fit(values.professional, 36, 211, 248, 9);
-  fit(values.date, 304, 211, 68, 9);
   document.setTitle('Laudo para Solicitação/Autorização de Procedimento Ambulatorial');
   return document.save();
 }
