@@ -15,3 +15,6 @@
 
 # Configuração privada do SMTP
 /api/mail.local.php
+
+# Arquivo bruto SIGTAP usado apenas para gerar o catálogo
+/sigtap-*.zip

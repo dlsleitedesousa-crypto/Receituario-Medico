@@ -3,6 +3,9 @@
 .apac-editor-panel{width:min(850px,100%);background:#fff;border-radius:16px;padding:28px;box-shadow:0 20px 60px #0003}
 .apac-editor-head{display:flex;justify-content:space-between;align-items:start;gap:16px}.apac-editor-head h2{margin:0}.apac-editor-head p{margin:4px 0 14px;color:#69778b}
 .apac-fields{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 14px}.apac-fields .apac-wide{grid-column:1/-1}.apac-fields textarea{resize:vertical}
+.apac-lookup{position:relative}.apac-suggestions{position:absolute;z-index:3;top:100%;left:0;right:0;max-height:240px;overflow:auto;background:#fff;border:1px solid #9fb7d5;border-radius:8px;box-shadow:0 10px 25px #15223826}
+.apac-suggestions button{display:block;width:100%;padding:9px 11px;border:0;border-bottom:1px solid #edf0f4;background:#fff;color:#152238;text-align:left;font-size:13px}.apac-suggestions button:hover,.apac-suggestions button:focus{background:#e9f4ff}
+.apac-catalog-status{margin:0 0 14px;color:#40516a;font-size:13px}
 .apac-sheet{width:210mm;height:297mm;margin:0 auto 22px;padding:10mm;background:#fff;color:#182333;box-sizing:border-box;font:11px/1.25 Arial,sans-serif;overflow:hidden}
 .apac-title{text-align:center;border:1px solid #344253;padding:6px}.apac-title strong{display:block;text-align:left;font-size:12px}.apac-title h2{font-size:14px;margin:4px 0}.apac-title small{font-size:9px}
 .apac-section{background:#e9edf2;border:1px solid #344253;border-top:0;padding:4px 6px;font-weight:700;font-size:10px}

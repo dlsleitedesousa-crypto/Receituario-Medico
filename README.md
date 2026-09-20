@@ -68,6 +68,10 @@ Publique também `print-pdf.js` e a pasta `vendor/`. As bibliotecas html2canvas 
 
 ## APAC
 
-No receituário, **APAC** abre os campos de procedimento, código SIGTAP opcional, quantidade, CID-10, diagnóstico e observações. A prévia preenche o nome e a data de nascimento do paciente, o estabelecimento e os dados disponíveis do profissional; os demais campos do laudo permanecem em branco para preenchimento pelo responsável. **Imprimir ou salvar PDF** gera o laudo A4 no navegador. Publique também `apac.js` e `apac.css`.
+No receituário, **APAC** abre os campos de procedimento, código SIGTAP automático, quantidade, CID-10, diagnóstico e observações. A prévia preenche o nome e a data de nascimento do paciente, o estabelecimento e os dados disponíveis do profissional; os demais campos do laudo permanecem em branco para preenchimento pelo responsável. **Imprimir ou salvar PDF** gera o laudo A4 no navegador. Publique também `apac.js` e `apac.css`.
+
+O catálogo local `apac-catalog.json` foi gerado da [Tabela Unificada SIGTAP do DATASUS](https://sigtap.datasus.gov.br/tabela-unificada/app/download.jsp), competência **09/2026**. Inclui os 873 procedimentos com instrumento de registro **06 — APAC (procedimento principal)** e os 14.246 códigos CID-10 da mesma competência. A busca aceita nome ou código; a escolha do procedimento preenche seu código SIGTAP, e a escolha de CID preenche o código e sugere a descrição no diagnóstico quando ele estiver vazio. O catálogo é uma referência de registro; a autorização e as regras clínicas devem ser conferidas no SIGTAP da competência vigente.
+
+Para atualizar o catálogo, baixe o ZIP da competência no SIGTAP e execute `node tools/build-apac-catalog.mjs caminho/para/TabelaUnificada_YYYYMM.zip`. Versione o JSON gerado, sem incluir o ZIP bruto, e publique também `apac-catalog.json`.
 
 O layout segue os campos do [Anexo I da Portaria SAS/MS nº 768/2006](https://bvsms.saude.gov.br/bvs/saudelegis/gm/2006/anexo/anexo_prt0768_26_10_2006.pdf). O PDF gerado é uma solicitação; número e validade da autorização dependem do órgão autorizador.
