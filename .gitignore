@@ -18,3 +18,6 @@
 
 # Arquivo bruto SIGTAP usado apenas para gerar o catálogo
 /sigtap-*.zip
+
+# Arquivos temporários de verificação
+/tmp/
