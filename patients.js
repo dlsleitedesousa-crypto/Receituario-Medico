@@ -2,6 +2,17 @@
 (() => {
   const list = document.querySelector('#patientList');
   const search = document.querySelector('#patientSearch');
+  const placesTab = document.querySelector('#placesTab');
+  const patientsTab = document.querySelector('#patientsTab');
+  const selectTab = target => {
+    const patients = target === 'patients';
+    placesTab.setAttribute('aria-selected', String(!patients));
+    patientsTab.setAttribute('aria-selected', String(patients));
+    document.querySelector('#placesPanel').classList.toggle('hidden', patients);
+    document.querySelector('#patientsPanel').classList.toggle('hidden', !patients);
+  };
+  placesTab.onclick = () => selectTab('places');
+  patientsTab.onclick = () => selectTab('patients');
   let patients = [];
   const request = async (action, data = {}) => {
     const response = await fetch(`api/index.php?action=${encodeURIComponent(action)}`, {
@@ -54,6 +65,7 @@
         document.querySelector('#patientName').value = patient.name;
         document.querySelector('#patientDoc').value = patient.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
         document.querySelector('#patientBirthDate').value = patient.birth_date;
+        selectTab('places');
         toast('Paciente selecionado. Clique em “Atender” no local desejado.');
       };
       row.append(info, button);
@@ -87,6 +99,6 @@
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
-  document.addEventListener('patients:load', () => load().catch(notifyError));
+  document.addEventListener('patients:load', () => { selectTab('places'); load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();
