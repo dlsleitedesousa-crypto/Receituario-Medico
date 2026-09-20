@@ -18,7 +18,7 @@ function loadPdfLibraries() {
 async function createPreviewPdf(preview) {
   await loadPdfLibraries();
   await document.fonts.ready;
-  const pages = [...preview.querySelectorAll(':scope > .paper, :scope > .special-sheet')];
+  const pages = [...preview.querySelectorAll(':scope > .paper, :scope > .special-sheet, :scope > .apac-sheet')];
   if (!pages.length) throw new Error('Nenhuma folha disponível');
   const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   pdf.setProperties({ title: 'Flow Receita — Documento', creator: 'Flow Receita' });

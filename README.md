@@ -65,3 +65,9 @@ No site publicado, os cadastros são salvos na tabela `medicines`, vinculados ao
 O botão “Imprimir ou salvar PDF” gera um PDF A4 no próprio navegador e abre o arquivo em uma nova aba. No iPhone e iPad, use Compartilhar → Imprimir no visualizador de PDF. Cada folha da prévia corresponde a uma página do arquivo; a receita especial mantém as duas vias. A geração usa imagens em resolução dupla e preserva o conteúdo visual, mas o texto do PDF não é selecionável.
 
 Publique também `print-pdf.js` e a pasta `vendor/`. As bibliotecas html2canvas 1.4.1 e jsPDF 4.2.1 ficam no próprio site, com suas licenças; são carregadas apenas ao gerar o PDF. O documento é processado localmente, sem envio dos dados do paciente a um serviço de PDF.
+
+## APAC
+
+No receituário, **Criar APAC** abre os campos de procedimento, código SIGTAP opcional, quantidade, CID-10, diagnóstico e observações. A prévia preenche o nome e a data de nascimento do paciente, o estabelecimento e os dados disponíveis do profissional; os demais campos do laudo permanecem em branco para preenchimento pelo responsável. **Imprimir ou salvar PDF** gera o laudo A4 no navegador. Publique também `apac.js` e `apac.css`.
+
+O layout segue os campos do [Anexo I da Portaria SAS/MS nº 768/2006](https://bvsms.saude.gov.br/bvs/saudelegis/gm/2006/anexo/anexo_prt0768_26_10_2006.pdf). O PDF gerado é uma solicitação; número e validade da autorização dependem do órgão autorizador.
