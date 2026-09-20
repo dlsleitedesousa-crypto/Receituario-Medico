@@ -6,15 +6,15 @@
   const history = document.querySelector('#patientHistory');
   const placesTab = document.querySelector('#placesTab');
   const patientsTab = document.querySelector('#patientsTab');
+  const patientsPanel = document.querySelector('#patientsPanel');
+  document.querySelector('#patientDirectoryHost').append(patientsPanel);
+  patientsPanel.classList.remove('hidden');
   const selectTab = target => {
-    const patients = target === 'patients';
-    placesTab.setAttribute('aria-selected', String(!patients));
-    patientsTab.setAttribute('aria-selected', String(patients));
-    document.querySelector('#placesPanel').classList.toggle('hidden', patients);
-    document.querySelector('#patientsPanel').classList.toggle('hidden', !patients);
+    show(target === 'patients' ? '#patientsScreen' : '#placesScreen');
   };
   placesTab.onclick = () => selectTab('places');
-  patientsTab.onclick = () => selectTab('patients');
+  patientsTab.onclick = () => { selectTab('patients'); load().catch(notifyError); };
+  document.querySelector('#backFromPatients').onclick = () => selectTab('places');
   let patients = [];
   const request = async (action, data = {}) => {
     const response = await fetch(`api/index.php?action=${encodeURIComponent(action)}`, {
@@ -30,6 +30,15 @@
     name: document.querySelector('#patientName').value.trim(),
     cpf: document.querySelector('#patientDoc').value.replace(/\D/g, ''),
     birth_date: document.querySelector('#patientBirthDate').value
+  });
+  const registrationData = () => ({
+    name: document.querySelector('#newPatientName').value.trim(),
+    cpf: document.querySelector('#newPatientCpf').value.replace(/\D/g, ''),
+    birth_date: document.querySelector('#newPatientBirthDate').value
+  });
+  document.querySelector('#newPatientCpf').addEventListener('input', event => {
+    const digits = event.target.value.replace(/\D/g, '').slice(0, 11);
+    event.target.value = digits.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   });
   const validPatient = () => {
     const { name, cpf, birth_date } = patientData();
@@ -120,6 +129,23 @@
   };
   const load = async () => { patients = (await request('patients.list')).items; render(); };
   search.addEventListener('input', render);
+  document.querySelector('#patientRegistrationForm').onsubmit = async event => {
+    event.preventDefault();
+    const data = registrationData();
+    if (data.name.split(/\s+/).length < 2 || data.cpf.length !== 11 || patientAge(data.birth_date) === null) {
+      toast('Informe nome completo, CPF com 11 dígitos e data de nascimento válida.');
+      return;
+    }
+    const button = document.querySelector('#registerPatientButton');
+    button.disabled = true;
+    try {
+      await request('patients.save', data);
+      event.target.reset();
+      await load();
+      toast('Paciente cadastrado.');
+    } catch (error) { notifyError(error); }
+    finally { button.disabled = false; }
+  };
   document.querySelector('#savePatient').onclick = async () => {
     if (!validPatient()) return;
     const button = document.querySelector('#savePatient');
