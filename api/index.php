@@ -242,6 +242,22 @@ try {
         $stmt->execute([$patientId,$userId]);
         respond(['ok' => true, 'patient' => $patient, 'items' => $stmt->fetchAll()]);
     }
+    if ($action === 'patients.delete') {
+        $patientId = (int)($data['id'] ?? 0);
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('SELECT id FROM patients WHERE id=? AND user_id=? FOR UPDATE');
+        $stmt->execute([$patientId, $userId]);
+        if (!$stmt->fetch()) {
+            $pdo->rollBack();
+            respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
+        }
+        $stmt = $pdo->prepare('DELETE FROM appointments WHERE patient_id=? AND user_id=?');
+        $stmt->execute([$patientId, $userId]);
+        $stmt = $pdo->prepare('DELETE FROM patients WHERE id=? AND user_id=?');
+        $stmt->execute([$patientId, $userId]);
+        $pdo->commit();
+        respond(['ok' => true]);
+    }
     if (in_array($action, ['patients.save', 'patients.update', 'appointments.save'], true)) {
         $name = trim((string)($data['name'] ?? ''));
         $cpf = preg_replace('/\D/', '', (string)($data['cpf'] ?? ''));

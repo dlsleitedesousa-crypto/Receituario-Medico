@@ -154,9 +154,28 @@
         selectTab('places');
         toast('Paciente selecionado. Clique em “Atender” no local desejado.');
       };
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'btn red';
+      deleteButton.textContent = 'Excluir';
+      deleteButton.onclick = async () => {
+        const count = Number(patient.appointments) || 0;
+        const warning = count ? ` e ${count} atendimento(s) salvo(s)` : '';
+        if (!confirm(`Excluir definitivamente o cadastro de ${patient.name}${warning}? Esta ação não pode ser desfeita.`)) return;
+        deleteButton.disabled = true;
+        try {
+          await request('patients.delete', { id: patient.id });
+          if (editingPatientId === patient.id) stopEditing();
+          if (document.querySelector('#patientDoc').value.replace(/\D/g, '') === patient.cpf) clearPatient();
+          detail.classList.add('hidden');
+          await load();
+          toast('Paciente e atendimentos vinculados excluídos.');
+        } catch (error) { notifyError(error); }
+        finally { deleteButton.disabled = false; }
+      };
       const actions = document.createElement('div');
       actions.className = 'patient-row-actions';
-      actions.append(historyButton, editButton, button);
+      actions.append(historyButton, editButton, button, deleteButton);
       row.append(info, actions);
       list.append(row);
     });
