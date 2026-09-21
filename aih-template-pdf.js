@@ -8,26 +8,36 @@ async function createAihTemplatePdf(values, templateBytes, PDFLib) {
   const color = rgb(0.07, 0.13, 0.2);
   const clean = value => Array.from(String(value ?? '').replace(/\r/g, ''))
     .map(char => { try { font.encodeText(char); return char; } catch { return '?'; } }).join('');
-  const line = (value, x, y, width, size = 8, label = 'texto') => {
+  const line = (value, x, y, width, size = 10, label = 'texto') => {
     const text = clean(value).replace(/\s+/g, ' ').trim();
     if (!text) return;
     while (font.widthOfTextAtSize(text, size) > width && size > 6) size -= 0.25;
     if (font.widthOfTextAtSize(text, size) > width) throw new Error(`Reduza o ${label} para caber na lacuna do formulário AIH.`);
     page.drawText(text, { x, y, size, font, color });
   };
-  const block = (value, x, y, width, maxLines, size = 8, lineHeight = 10) => {
+  const wrap = (value, width, size) => {
     const lines = [];
     for (const paragraph of clean(value).split('\n')) {
       let current = '';
       for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-        if (font.widthOfTextAtSize(word, size) > width) throw new Error('Há uma palavra longa demais para o formulário AIH.');
+        if (font.widthOfTextAtSize(word, size) > width) return null;
         const candidate = current ? `${current} ${word}` : word;
         if (font.widthOfTextAtSize(candidate, size) <= width) current = candidate;
         else { lines.push(current); current = word; }
       }
       lines.push(current);
     }
-    if (lines.length > maxLines) throw new Error('Reduza o texto da justificativa para caber no formulário AIH.');
+    return lines;
+  };
+  const block = (value, x, y, width, height, label) => {
+    if (!String(value || '').trim()) return;
+    let size, lines, lineHeight;
+    for (let candidate = 12; candidate >= 7; candidate -= 0.5) {
+      const wrapped = wrap(value, width, candidate);
+      const leading = candidate + 2;
+      if (wrapped && (wrapped.length - 1) * leading <= height) { size = candidate; lines = wrapped; lineHeight = leading; break; }
+    }
+    if (!lines) throw new Error(`Reduza ${label} para caber na lacuna do formulário AIH.`);
     lines.forEach((text, index) => { if (text) page.drawText(text, { x, y: y - index * lineHeight, size, font, color }); });
   };
   const boxedDigits = (value, count, firstCenter, spacing, y, label) => {
@@ -35,15 +45,15 @@ async function createAihTemplatePdf(values, templateBytes, PDFLib) {
     const digits = String(value).replace(/\D/g, '');
     if (digits.length !== count) throw new Error(`${label} deve ter ${count} dígitos.`);
     [...digits].forEach((digit, index) => page.drawText(digit, {
-      x: firstCenter + index * spacing - font.widthOfTextAtSize(digit, 9) / 2,
-      y, size: 9, font, color
+      x: firstCenter + index * spacing - font.widthOfTextAtSize(digit, 10) / 2,
+      y, size: 10, font, color
     }));
   };
   const boxedDate = (value, positions, y, label) => {
     if (!value) return;
     const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
     if (!match) throw new Error(`${label} inválida.`);
-    positions.forEach((left, index) => line(match[index + 1], left, y, index === 2 ? 35 : 18, 9));
+    positions.forEach((left, index) => line(match[index + 1], left, y, index === 2 ? 35 : 18, 10));
   };
   line(values.placeName, 60, 744, 408);
   boxedDigits(values.cnes, 7, 477.5, 15, 744, 'CNES');
@@ -65,26 +75,23 @@ async function createAihTemplatePdf(values, templateBytes, PDFLib) {
   line(values.cityCode, 365, 566, 78);
   line(values.state, 454, 566, 50);
   line(values.postcode, 515, 566, 60);
-  block(values.symptoms, 60, 526, 515, 8);
-  block(values.conditions, 60, 420, 515, 4);
-  block(values.tests, 60, 365, 515, 3);
-  line(values.diagnosis, 35, 313, 230, 8, 'diagnóstico');
+  block(values.symptoms, 60, 526, 515, 80, 'os sinais e sintomas');
+  block(values.conditions, 60, 420, 515, 30, 'as condições que justificam');
+  block(values.tests, 60, 365, 515, 26, 'os resultados diagnósticos');
+  line(values.diagnosis, 35, 313, 230, 10, 'diagnóstico');
   line(values.cid, 287, 313, 82);
   line(values.secondaryCid, 379, 313, 82);
   line(values.associatedCid, 470, 313, 105);
   const procedureText = clean(values.procedure).replace(/\s+/g, ' ').trim();
-  if (font.widthOfTextAtSize(procedureText, 8) <= 335) line(procedureText, 42, 275, 335);
+  if (font.widthOfTextAtSize(procedureText, 8) <= 335) line(procedureText, 42, 275, 335, 10, 'procedimento');
   else {
-    const lineCount = size => {
-      let count = 1, current = '';
-      for (const word of procedureText.split(' ')) {
-        const candidate = current ? `${current} ${word}` : word;
-        if (font.widthOfTextAtSize(candidate, size) <= 335) current = candidate;
-        else { count++; current = word; }
-      }
-      return count;
-    };
-    block(procedureText, 42, 279, 335, 2, lineCount(7) <= 2 ? 7 : 6, 7);
+    let size, lines;
+    for (const candidate of [7.5, 7, 6.5, 6]) {
+      const wrapped = wrap(procedureText, 335, candidate);
+      if (wrapped && wrapped.length <= 2) { size = candidate; lines = wrapped; break; }
+    }
+    if (!lines) throw new Error('Reduza o procedimento para caber na lacuna do formulário AIH.');
+    lines.forEach((text, index) => page.drawText(text, { x: 42, y: 279 - index * size, size, font, color }));
   }
   boxedDigits(values.code, 10, 408.75, 17.5, 275, 'Código SIGTAP');
   line(values.clinic, 64, 252, 66);
