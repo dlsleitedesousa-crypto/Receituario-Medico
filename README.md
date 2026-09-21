@@ -77,3 +77,7 @@ O catálogo local `apac-catalog.json` foi gerado da [Tabela Unificada SIGTAP do 
 Para atualizar o catálogo, baixe o ZIP da competência no SIGTAP e execute `node tools/build-apac-catalog.mjs caminho/para/TabelaUnificada_YYYYMM.zip`. Versione o JSON gerado, sem incluir o ZIP bruto, e publique também `apac-catalog.json`.
 
 O layout segue os campos do [Anexo I da Portaria SAS/MS nº 768/2006](https://bvsms.saude.gov.br/bvs/saudelegis/gm/2006/anexo/anexo_prt0768_26_10_2006.pdf). O PDF gerado é uma solicitação; número e validade da autorização dependem do órgão autorizador.
+
+## AIH
+
+O botão **AIH** abre o laudo de solicitação de autorização de internação hospitalar. A tela preenche dados do paciente e do profissional a partir do atendimento, permite completar identificação, justificativa, diagnóstico, procedimento e causas externas, e gera o PDF sobre o formulário original fornecido pelo usuário em `assets/aih-modelo.pdf`. Os campos de autorização permanecem para o órgão autorizador. **Salvar modelo** fica ao lado de **Gerar PDF da AIH**; a coluna de modelos permite pesquisar, aplicar, atualizar e excluir modelos em ordem alfabética. Os modelos guardam somente justificativa, diagnóstico e procedimento, sem dados pessoais do paciente.
