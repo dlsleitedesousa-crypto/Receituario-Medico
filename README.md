@@ -84,4 +84,4 @@ O botão **AIH** abre um formulário apenas com procedimento principal e código
 
 ## Histórico de atendimentos
 
-**Salvar atendimento** grava o documento atual e confirma que ele aparece no histórico do paciente. Documentos personalizados são aceitos. Ao gerar o PDF de APAC ou AIH, a solicitação também é registrada no histórico. Para vincular qualquer atendimento ao paciente, informe nome completo, CPF com 11 dígitos e data de nascimento válida; o resumo temporário de impressões não substitui esse registro no banco.
+**Salvar atendimento** grava o documento atual e confirma que ele aparece no histórico do paciente. Abrir o PDF de receitas simples ou especiais, atestados, laudos, solicitações de exames ou fisioterapia e documentos personalizados também registra o documento no histórico; voltar da prévia não apaga o texto. Ao gerar o PDF de APAC ou AIH, a solicitação também é registrada. Repetir a impressão do mesmo documento nos cinco minutos seguintes não duplica o registro. Para vincular qualquer atendimento ao paciente, informe nome completo, CPF com 11 dígitos e data de nascimento válida; o resumo temporário de impressões não substitui esse registro no banco.

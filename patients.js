@@ -379,20 +379,34 @@
     catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
+  const recentAppointments = new Map();
   const saveAppointmentRecord = async ({ type, title, text, date }) => {
     if (!validPatient()) return null;
     if (!selectedPlace?.id || !type || !title || !text || !date) { toast('Selecione um local e preencha o texto e a data do documento.'); return null; }
-    const saved = await request('appointments.save', { ...patientData(), place_id: selectedPlace.id,
-      document_type: type, document_title: title, document_text: text, document_date: date });
-    if (!saved.appointment_id || !saved.patient_id) throw new Error('O servidor não confirmou o registro do atendimento.');
+    const patient = patientData();
+    const key = JSON.stringify([patient.cpf, selectedPlace.id, type, title, text, date]);
+    const recent = recentAppointments.get(key);
+    if (recent && Date.now() - recent.createdAt < 5 * 60 * 1000) return recent.promise;
+    const promise = (async () => {
+      const saved = await request('appointments.save', { ...patient, place_id: selectedPlace.id,
+        document_type: type, document_title: title, document_text: text, document_date: date });
+      if (!saved.appointment_id || !saved.patient_id) throw new Error('O servidor não confirmou o registro do atendimento.');
+      try {
+        await load();
+        const result = await request('patients.history', { id: saved.patient_id });
+        if (!result.items.some(item => String(item.id) === String(saved.appointment_id))) throw new Error('Registro não encontrado no histórico.');
+        return { ...saved, historyReady: true };
+      } catch (error) {
+        toast('Atendimento gravado, mas não foi possível atualizar o histórico agora. Abra o cadastro do paciente novamente.');
+        return { ...saved, historyReady: false };
+      }
+    })();
+    recentAppointments.set(key, { promise, createdAt: Date.now() });
     try {
-      await load();
-      const result = await request('patients.history', { id: saved.patient_id });
-      if (!result.items.some(item => String(item.id) === String(saved.appointment_id))) throw new Error('Registro não encontrado no histórico.');
-      return { ...saved, historyReady: true };
+      return await promise;
     } catch (error) {
-      toast('Atendimento gravado, mas não foi possível atualizar o histórico agora. Abra o cadastro do paciente novamente.');
-      return { ...saved, historyReady: false };
+      recentAppointments.delete(key);
+      throw error;
     }
   };
   window.saveAppointmentRecord = saveAppointmentRecord;
@@ -402,7 +416,8 @@
     try {
       const saved = await saveAppointmentRecord({
         type: document.querySelector('.type-card.active')?.dataset.type,
-        title: document.querySelector('#paperTitle').textContent.trim(),
+        title: document.querySelector('.type-card.active')?.dataset.type === 'especial'
+          ? 'Receita de Controle Especial' : document.querySelector('#paperTitle').textContent.trim(),
         text: document.querySelector('#rxText').value.trim(),
         date: document.querySelector('#rxDate').value
       });
@@ -410,6 +425,6 @@
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
-  document.addEventListener('patients:load', () => { patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
+  document.addEventListener('patients:load', () => { recentAppointments.clear(); patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();

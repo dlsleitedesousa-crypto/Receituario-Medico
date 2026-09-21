@@ -49,6 +49,6 @@ function renderPrintSummary(){
   });
 }
 $('#openPrintSummary').onclick=()=>{renderPrintSummary();show('#printSummaryScreen')};
-$('#backFromPrintSummary').onclick=()=>{$('#rxText').value='';show('#rxScreen')};
+$('#backFromPrintSummary').onclick=()=>show('#rxScreen');
 $('#copyPrintSummary').onclick=()=>{if(printSummaryEntries.length)copyPrintSummaryText(printSummaryEntries.map(printSummaryCopyText).join('\n\n'))};
 ['#logoutButton','#logoutRx'].forEach(id=>$(id).addEventListener('click',resetPrintSummary));
