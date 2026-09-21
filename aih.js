@@ -15,6 +15,7 @@
         <label class="field apac-lookup apac-wide"><span>Procedimento AIH principal</span><input id="aihProcedure" required autocomplete="off" placeholder="Buscar por nome ou código SIGTAP"><div class="apac-suggestions hidden" id="aihProcedureSuggestions"></div></label>
         <label class="field"><span>Código SIGTAP</span><input id="aihCode" inputmode="numeric" maxlength="10" readonly required></label>
         <label class="field apac-lookup"><span>CID-10 principal</span><input id="aihCid" required autocomplete="off" placeholder="Buscar por código ou descrição"><div class="apac-suggestions hidden" id="aihCidSuggestions"></div></label>
+        <label class="field apac-wide"><span>Diagnóstico inicial</span><input id="aihDiagnosis" required placeholder="Preenchido ao selecionar o CID-10; ajuste se precisar resumir para o PDF"></label>
         <label class="field apac-wide"><span>Sinais e Sintomas</span><textarea id="aihSymptoms" rows="4" required></textarea></label>
         <label class="field apac-wide"><span>Condições que justificam</span><textarea id="aihConditions" rows="3" required></textarea></label>
         <label class="field apac-wide"><span>Principais resultados diagnósticos</span><textarea id="aihTests" rows="3"></textarea></label>
@@ -24,7 +25,7 @@
   const $ = selector => dialog.querySelector(selector);
   const normal = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const date = value => value ? value.split('-').reverse().join('/') : '';
-  const reusable = ['procedure', 'code', 'cid', 'symptoms', 'conditions', 'tests'];
+  const reusable = ['procedure', 'code', 'cid', 'diagnosis', 'symptoms', 'conditions', 'tests'];
   const field = name => $(`#aih${name[0].toUpperCase()}${name.slice(1)}`);
   const valuesForModel = () => Object.fromEntries(reusable.map(name => [name, field(name).value.trim()]));
   const localMode = ['127.0.0.1', 'localhost'].includes(location.hostname);
@@ -44,7 +45,7 @@
     for (const model of matches) {
       const row = document.createElement('div'); row.className = 'apac-model-item'; row.setAttribute('role', 'listitem');
       const use = document.createElement('button'); use.type = 'button'; use.className = 'apac-model-use'; use.textContent = model.name;
-      use.onclick = () => { editingId = model.id; $('#aihModelName').value = model.name; reusable.forEach(name => { field(name).value = model.values[name] || ''; }); $('#aihProcedure').focus(); };
+      use.onclick = () => { editingId = model.id; $('#aihModelName').value = model.name; reusable.forEach(name => { field(name).value = model.values[name] || ''; }); if (!$('#aihDiagnosis').value) syncDiagnosis(); $('#aihProcedure').focus(); };
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'apac-model-delete'; remove.textContent = 'Excluir';
       remove.onclick = async () => { if (!confirm(`Excluir o modelo “${model.name}”?`)) return; remove.disabled = true; try { if (localMode) { models = models.filter(item => item.id !== model.id); localStorage.setItem(localKey, JSON.stringify(models)); } else { await api('models.delete', { category: 'aih', id: model.id }); await loadModels(); } if (editingId === model.id) editingId = null; render(); toast('Modelo excluído'); } catch (error) { toast(error.message); remove.disabled = false; } };
       row.append(use, remove); list.append(row);
@@ -64,6 +65,7 @@
       const [aih, apac] = await Promise.all(responses.map(response => response.json()));
       if (!Array.isArray(aih.procedures) || !Array.isArray(apac.cids) || aih.competence !== apac.competence) throw new Error('Catálogo SIGTAP inválido.');
       catalog = { procedures: aih.procedures, cids: apac.cids };
+      if (!$('#aihDiagnosis').value) syncDiagnosis();
       $('#aihCatalogStatus').textContent = `SIGTAP ${aih.competence.slice(4)}/${aih.competence.slice(0, 4)} · ${aih.procedures.length} procedimentos AIH principais · ${apac.cids.length} códigos CID-10`;
     }).catch(error => { catalogPromise = undefined; $('#aihCatalogStatus').textContent = 'Não foi possível carregar a tabela SIGTAP. Verifique a conexão e abra a AIH novamente.'; throw error; });
     return catalogPromise;
@@ -79,9 +81,10 @@
   };
   const cidDisplay = code => code.length === 4 ? `${code.slice(0, 3)}.${code[3]}` : code;
   const setProcedure = item => { $('#aihProcedure').value = item.name; $('#aihCode').value = item.code; $('#aihProcedureSuggestions').classList.add('hidden'); };
-  const setCid = item => { $('#aihCid').value = cidDisplay(item.code); $('#aihCidSuggestions').classList.add('hidden'); };
+  const syncDiagnosis = () => { const code = $('#aihCid').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); $('#aihDiagnosis').value = catalog?.cids.find(item => item.code === code)?.name || ''; };
+  const setCid = item => { $('#aihCid').value = cidDisplay(item.code); $('#aihDiagnosis').value = item.name; $('#aihCidSuggestions').classList.add('hidden'); };
   $('#aihProcedure').oninput = () => { $('#aihCode').value = ''; suggest($('#aihProcedure'), $('#aihProcedureSuggestions'), catalog?.procedures || [], item => `${item.code} · ${item.name}`, setProcedure); };
-  $('#aihCid').oninput = () => suggest($('#aihCid'), $('#aihCidSuggestions'), catalog?.cids || [], item => `${cidDisplay(item.code)} · ${item.name}`, setCid);
+  $('#aihCid').oninput = () => { syncDiagnosis(); suggest($('#aihCid'), $('#aihCidSuggestions'), catalog?.cids || [], item => `${cidDisplay(item.code)} · ${item.name}`, setCid); };
   $('#aihProcedure').onblur = () => setTimeout(() => { $('#aihProcedureSuggestions').classList.add('hidden'); const value = normal($('#aihProcedure').value); const item = catalog?.procedures.find(entry => normal(entry.code) === value || normal(entry.name) === value); if (item) setProcedure(item); }, 150);
   $('#aihCid').onblur = () => setTimeout(() => { $('#aihCidSuggestions').classList.add('hidden'); const code = $('#aihCid').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); const item = catalog?.cids.find(entry => entry.code === code); if (item) setCid(item); }, 150);
   const validateCatalog = () => {
@@ -92,7 +95,7 @@
     return true;
   };
   $('#aihModelSearch').oninput = render;
-  $('#newAihModel').onclick = () => { editingId = null; reusable.forEach(name => { field(name).value = ''; }); $('#aihModelName').value = ''; $('#aihModelName').focus(); };
+  $('#newAihModel').onclick = () => { editingId = null; reusable.forEach(name => { field(name).value = ''; }); $('#aihDiagnosis').value = ''; $('#aihModelName').value = ''; $('#aihModelName').focus(); };
   $('#saveAihModel').onclick = async () => {
     const name = $('#aihModelName').value.trim();
     if (!name) { toast('Informe o nome do modelo.'); $('#aihModelName').focus(); return; }
@@ -120,7 +123,7 @@
     if (!patient) { toast('Informe o nome do paciente.'); close(); return; }
     const place = selectedPlace || {}, reusableValues = valuesForModel();
     const cidCode = reusableValues.cid.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const values = { ...reusableValues, cid: cidDisplay(cidCode), placeName: place.name || '', cnes: place.cnes || '', patient, birthDate: date(document.querySelector('#patientBirthDate').value), professional: doctor.name || '', professionalCpf: doctor.cpf || '', date: date(document.querySelector('#rxDate').value || new Date().toISOString().slice(0, 10)) };
+    const values = { ...reusableValues, cid: cidDisplay(cidCode), diagnosis: $('#aihDiagnosis').value, placeName: place.name || '', cnes: place.cnes || '', patient, birthDate: date(document.querySelector('#patientBirthDate').value), professional: doctor.name || '', professionalCpf: doctor.cpf || '', date: date(document.querySelector('#rxDate').value || new Date().toISOString().slice(0, 10)) };
     const button = event.currentTarget.querySelector('button[type="submit"]'), label = button.textContent;
     button.disabled = true; button.textContent = 'Preparando PDF…';
     try { if (await openAihTemplatePdf(values)) { close(); printSummaryEntries.push({ title: 'Solicitação de AIH', patient, cpf: document.querySelector('#patientDoc').value, birthDate: document.querySelector('#patientBirthDate').value, age: patientAge(document.querySelector('#patientBirthDate').value), text: `Procedimento: ${values.procedure}\nCódigo SIGTAP: ${values.code}\nCID-10: ${values.cid}\nSinais e sintomas: ${values.symptoms}\nCondições: ${values.conditions}\nResultados diagnósticos: ${values.tests}`, date: document.querySelector('#rxDate').value, professional: doctor.name, place: place.name || '', address: place.address || '', phone: place.phone || '', cnpj: place.cnpj || '', cnes: place.cnes || '', requestedAt: new Date().toLocaleString('pt-BR') }); } }
