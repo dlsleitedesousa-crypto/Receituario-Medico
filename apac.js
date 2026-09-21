@@ -8,7 +8,7 @@
   form.setAttribute('aria-modal', 'true');
   form.setAttribute('aria-labelledby', 'apacEditorTitle');
   form.innerHTML = `<div class="apac-editor-panel">
-    <div class="apac-editor-head"><div><h2 id="apacEditorTitle">Criar APAC</h2><p>Laudo para solicitação/autorização de procedimentos ambulatoriais do SUS</p></div><div class="apac-editor-head-actions"><button class="btn blue" type="button" id="saveApacModel">Salvar modelo</button><button class="btn outline" type="button" id="closeApac">Fechar</button></div></div>
+    <div class="apac-editor-head"><div><h2 id="apacEditorTitle">Criar APAC</h2><p>Laudo para solicitação/autorização de procedimentos ambulatoriais do SUS</p></div><button class="btn outline" type="button" id="closeApac">Fechar</button></div>
     <div class="apac-workspace"><aside class="apac-models" aria-label="Modelos de APAC salvos"><h3>Modelos salvos</h3><label class="field"><span>Pesquisar modelo</span><input id="apacModelSearch" type="search" placeholder="Digite o nome do modelo"></label><div id="apacModelList" class="apac-model-list" role="list"></div><button class="btn outline" type="button" id="newApacModel">Novo modelo</button></aside>
     <form id="apacForm" class="apac-form"><label class="field apac-model-name"><span>Nome do modelo</span><input id="apacModelName" maxlength="180" placeholder="Ex.: Consulta de acompanhamento"></label>
     <div class="apac-fields">
@@ -18,7 +18,7 @@
       <label class="field apac-lookup"><span>CID-10 principal</span><input id="apacCid" required autocomplete="off" maxlength="100" placeholder="Buscar por código ou descrição"><div class="apac-suggestions hidden" id="apacCidSuggestions"></div></label>
       <label class="field apac-wide"><span>Diagnóstico</span><textarea id="apacDiagnosis" rows="3" required></textarea></label>
       <label class="field apac-wide"><span>Observações</span><textarea id="apacNotes" rows="4"></textarea></label>
-    </div><p class="apac-catalog-status" id="apacCatalogStatus" role="status">Carregando tabela SIGTAP e CID-10…</p><div class="actions"><button class="btn blue" type="submit">Gerar PDF da APAC</button></div>
+    </div><p class="apac-catalog-status" id="apacCatalogStatus" role="status">Carregando tabela SIGTAP e CID-10…</p><div class="actions apac-actions"><button class="btn outline" type="button" id="saveApacModel">Salvar modelo</button><button class="btn blue" type="submit">Gerar PDF da APAC</button></div>
   </form>`;
   document.body.append(form);
   const $ = selector => document.querySelector(selector);
