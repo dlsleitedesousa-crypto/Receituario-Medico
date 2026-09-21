@@ -9,7 +9,7 @@
   form.setAttribute('aria-labelledby', 'apacEditorTitle');
   form.innerHTML = `<div class="apac-editor-panel">
     <div class="apac-editor-head"><div><h2 id="apacEditorTitle">Criar APAC</h2><p>Laudo para solicitação/autorização de procedimentos ambulatoriais do SUS</p></div><button class="btn outline" type="button" id="closeApac">Fechar</button></div>
-    <div class="apac-workspace"><aside class="apac-models" aria-label="Modelos de APAC salvos"><h3>Modelos salvos</h3><label class="field"><span>Pesquisar modelo</span><input id="apacModelSearch" type="search" placeholder="Digite o nome do modelo"></label><div id="apacModelList" class="apac-model-list" role="list"></div></aside>
+    <div class="apac-workspace"><aside class="apac-models" aria-label="Modelos de APAC salvos"><h3>Modelos salvos</h3><label class="field"><span>Pesquisar modelo</span><input id="apacModelSearch" type="search" placeholder="Digite o nome do modelo"></label><div id="apacModelList" class="apac-model-list" role="list"></div><button class="btn outline" type="button" id="newApacModel">Novo modelo</button></aside>
     <form id="apacForm" class="apac-form"><label class="field apac-model-name"><span>Nome do modelo</span><input id="apacModelName" maxlength="180" placeholder="Ex.: Consulta de acompanhamento"></label>
     <div class="apac-fields">
       <label class="field apac-lookup"><span>Procedimento APAC principal</span><input id="apacProcedure" required autocomplete="off" placeholder="Buscar por nome ou código SIGTAP"><div class="apac-suggestions hidden" id="apacProcedureSuggestions"></div></label>
@@ -18,13 +18,62 @@
       <label class="field apac-lookup"><span>CID-10 principal</span><input id="apacCid" required autocomplete="off" maxlength="100" placeholder="Buscar por código ou descrição"><div class="apac-suggestions hidden" id="apacCidSuggestions"></div></label>
       <label class="field apac-wide"><span>Diagnóstico</span><textarea id="apacDiagnosis" rows="3" required></textarea></label>
       <label class="field apac-wide"><span>Observações</span><textarea id="apacNotes" rows="4"></textarea></label>
-    </div><p class="apac-catalog-status" id="apacCatalogStatus" role="status">Carregando tabela SIGTAP e CID-10…</p><div class="actions"><button class="btn blue" type="submit">Gerar PDF da APAC</button></div>
+    </div><p class="apac-catalog-status" id="apacCatalogStatus" role="status">Carregando tabela SIGTAP e CID-10…</p><div class="actions"><button class="btn outline" type="button" id="saveApacModel">Salvar modelo</button><button class="btn blue" type="submit">Gerar PDF da APAC</button></div>
   </form>`;
   document.body.append(form);
   const $ = selector => document.querySelector(selector);
   const date = value => value ? value.split('-').reverse().join('/') : '';
   let catalogPromise;
   let catalog;
+  let models = [];
+  let editingModelId = null;
+  const localModelsKey = 'clinicaFlowApacModels';
+  const localMode = ['127.0.0.1', 'localhost'].includes(location.hostname);
+  const modelFields = ['procedure', 'code', 'quantity', 'cid', 'diagnosis', 'notes'];
+  const modelValues = () => Object.fromEntries(modelFields.map(field => [field, $(`#apac${field[0].toUpperCase()}${field.slice(1)}`).value.trim()]));
+  const api = async (action, data = {}) => {
+    const response = await fetch(`api/index.php?action=${encodeURIComponent(action)}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) throw new Error(result.error || 'Não foi possível concluir a operação.');
+    return result;
+  };
+  const renderModels = () => {
+    const list = $('#apacModelList');
+    const query = normal($('#apacModelSearch').value);
+    const matches = [...models].filter(model => normal(model.name).includes(query)).sort((a, b) => new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true }).compare(a.name, b.name));
+    list.replaceChildren();
+    if (!matches.length) { const empty = document.createElement('p'); empty.className = 'apac-model-empty'; empty.textContent = query ? 'Nenhum modelo encontrado.' : 'Nenhum modelo salvo.'; list.append(empty); return; }
+    for (const model of matches) {
+      const row = document.createElement('div'); row.className = 'apac-model-item'; row.setAttribute('role', 'listitem');
+      const use = document.createElement('button'); use.type = 'button'; use.className = 'apac-model-use'; use.textContent = model.name; use.title = `Usar modelo ${model.name}`;
+      use.onclick = () => { editingModelId = model.id; $('#apacModelName').value = model.name; for (const field of modelFields) $(`#apac${field[0].toUpperCase()}${field.slice(1)}`).value = model.values[field] || ''; $('#apacProcedure').focus(); };
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'apac-model-delete'; remove.textContent = 'Excluir'; remove.title = `Excluir modelo ${model.name}`;
+      remove.onclick = async () => { if (!confirm(`Excluir o modelo “${model.name}”?`)) return; remove.disabled = true; try { if (localMode) { models = models.filter(item => item.id !== model.id); localStorage.setItem(localModelsKey, JSON.stringify(models)); } else { await api('models.delete', { category: 'apac', id: model.id }); await loadModels(); } if (editingModelId === model.id) editingModelId = null; renderModels(); toast('Modelo excluído'); } catch (error) { toast(error.message); remove.disabled = false; } };
+      row.append(use, remove); list.append(row);
+    }
+  };
+  const loadModels = async () => {
+    if (localMode) { try { const saved = JSON.parse(localStorage.getItem(localModelsKey)); models = Array.isArray(saved) ? saved : []; } catch { models = []; } }
+    else { const result = await api('models.list', { category: 'apac' }); models = result.items.map(item => { let values = {}; try { values = JSON.parse(item.text); } catch {} return { id: String(item.id), name: item.name, values }; }); }
+    renderModels();
+  };
+  $('#apacModelSearch').oninput = renderModels;
+  $('#newApacModel').onclick = () => { editingModelId = null; $('#apacForm').reset(); $('#apacCode').value = ''; $('#apacModelName').focus(); };
+  $('#saveApacModel').onclick = async () => {
+    const name = $('#apacModelName').value.trim();
+    if (!name) { toast('Informe o nome do modelo.'); $('#apacModelName').focus(); return; }
+    if (!$('#apacForm').reportValidity()) return;
+    if (catalog && !catalog.procedures.some(item => item.code === $('#apacCode').value && item.name === $('#apacProcedure').value)) { toast('Selecione um procedimento APAC da lista.'); $('#apacProcedure').focus(); return; }
+    const cid = $('#apacCid').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (catalog && !catalog.cids.some(item => item.code === cid)) { toast('Selecione um CID-10 válido da tabela.'); $('#apacCid').focus(); return; }
+    const button = $('#saveApacModel'); button.disabled = true;
+    try {
+      const values = modelValues();
+      if (localMode) { const id = editingModelId || `apac-${Date.now()}`; models = models.filter(item => item.id !== id); models.push({ id, name, values }); localStorage.setItem(localModelsKey, JSON.stringify(models)); editingModelId = id; }
+      else { const result = await api('models.save', { id: editingModelId, category: 'apac', name, type: 'apac', text: JSON.stringify(values) }); editingModelId = String(result.id); await loadModels(); }
+      renderModels(); toast('Modelo de APAC salvo');
+    } catch (error) { toast(error.message); } finally { button.disabled = false; }
+  };
   const normal = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const cidDisplay = code => code.length === 4 ? `${code.slice(0, 3)}.${code[3]}` : code;
   const setProcedure = item => { $('#apacProcedure').value = item.name; $('#apacCode').value = item.code; $('#apacProcedureSuggestions').classList.add('hidden'); };
@@ -95,6 +144,7 @@
     if (!$('#patientName').value.trim()) { toast('Informe o nome do paciente antes de criar a APAC.'); $('#patientName').focus(); return; }
     form.classList.remove('hidden');
     document.body.classList.add('apac-editing');
+    loadModels().catch(error => toast(error.message));
     $('#apacProcedure').focus();
     loadCatalog();
   };
