@@ -312,7 +312,7 @@ try {
             $text = trim((string)($data['document_text'] ?? ''));
             $date = (string)($data['document_date'] ?? '');
             $documentDate = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
-            if (!in_array($type, ['simples','especial','atestado','laudo','fisioterapia','exame'], true) || $title === '' || mb_strlen($title) > 180 || $text === '' || !$documentDate || $documentDate->format('Y-m-d') !== $date) {
+            if (!in_array($type, ['simples','especial','atestado','laudo','fisioterapia','exame','personalizado','apac','aih'], true) || $title === '' || mb_strlen($title) > 180 || $text === '' || !$documentDate || $documentDate->format('Y-m-d') !== $date) {
                 respond(['ok' => false, 'error' => 'Preencha o tipo, texto e data do documento.'], 422);
             }
         }

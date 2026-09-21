@@ -126,7 +126,17 @@
     const values = { ...reusableValues, cid: cidDisplay(cidCode), diagnosis: $('#aihDiagnosis').value, placeName: place.name || '', cnes: place.cnes || '', patient, birthDate: date(document.querySelector('#patientBirthDate').value), professional: doctor.name || '', professionalCpf: doctor.cpf || '', date: date(document.querySelector('#rxDate').value || new Date().toISOString().slice(0, 10)) };
     const button = event.currentTarget.querySelector('button[type="submit"]'), label = button.textContent;
     button.disabled = true; button.textContent = 'Preparando PDF…';
-    try { if (await openAihTemplatePdf(values)) { close(); printSummaryEntries.push({ title: 'Solicitação de AIH', patient, cpf: document.querySelector('#patientDoc').value, birthDate: document.querySelector('#patientBirthDate').value, age: patientAge(document.querySelector('#patientBirthDate').value), text: `Procedimento: ${values.procedure}\nCódigo SIGTAP: ${values.code}\nCID-10: ${values.cid}\nSinais e sintomas: ${values.symptoms}\nCondições: ${values.conditions}\nResultados diagnósticos: ${values.tests}`, date: document.querySelector('#rxDate').value, professional: doctor.name, place: place.name || '', address: place.address || '', phone: place.phone || '', cnpj: place.cnpj || '', cnes: place.cnes || '', requestedAt: new Date().toLocaleString('pt-BR') }); } }
+    try {
+      if (await openAihTemplatePdf(values)) {
+        close();
+        const entry = { title: 'Solicitação de AIH', patient, cpf: document.querySelector('#patientDoc').value, birthDate: document.querySelector('#patientBirthDate').value, age: patientAge(document.querySelector('#patientBirthDate').value), text: `Procedimento: ${values.procedure}\nCódigo SIGTAP: ${values.code}\nCID-10: ${values.cid}\nDiagnóstico: ${values.diagnosis}\nSinais e sintomas: ${values.symptoms}\nCondições: ${values.conditions}\nResultados diagnósticos: ${values.tests}`, date: document.querySelector('#rxDate').value, professional: doctor.name, place: place.name || '', address: place.address || '', phone: place.phone || '', cnpj: place.cnpj || '', cnes: place.cnes || '', requestedAt: new Date().toLocaleString('pt-BR') };
+        printSummaryEntries.push(entry);
+        try {
+          const saved = await window.saveAppointmentRecord({ type: 'aih', title: entry.title, text: entry.text, date: document.querySelector('#rxDate').value });
+          if (saved?.historyReady) toast('AIH salva no histórico do paciente.');
+        } catch (error) { toast(error.message || 'Não foi possível salvar a AIH no histórico.'); }
+      }
+    }
     finally { button.disabled = false; button.textContent = label; }
   };
 })();

@@ -379,20 +379,34 @@
     catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
+  const saveAppointmentRecord = async ({ type, title, text, date }) => {
+    if (!validPatient()) return null;
+    if (!selectedPlace?.id || !type || !title || !text || !date) { toast('Selecione um local e preencha o texto e a data do documento.'); return null; }
+    const saved = await request('appointments.save', { ...patientData(), place_id: selectedPlace.id,
+      document_type: type, document_title: title, document_text: text, document_date: date });
+    if (!saved.appointment_id || !saved.patient_id) throw new Error('O servidor não confirmou o registro do atendimento.');
+    try {
+      await load();
+      const result = await request('patients.history', { id: saved.patient_id });
+      if (!result.items.some(item => String(item.id) === String(saved.appointment_id))) throw new Error('Registro não encontrado no histórico.');
+      return { ...saved, historyReady: true };
+    } catch (error) {
+      toast('Atendimento gravado, mas não foi possível atualizar o histórico agora. Abra o cadastro do paciente novamente.');
+      return { ...saved, historyReady: false };
+    }
+  };
+  window.saveAppointmentRecord = saveAppointmentRecord;
   document.querySelector('#saveAppointment').onclick = async () => {
-    if (!validPatient()) return;
-    const type = document.querySelector('.type-card.active')?.dataset.type;
-    const text = document.querySelector('#rxText').value.trim();
-    const date = document.querySelector('#rxDate').value;
-    if (!selectedPlace?.id || !type || !text || !date) { toast('Selecione um local e preencha o texto e a data do documento.'); return; }
     const button = document.querySelector('#saveAppointment');
     button.disabled = true;
     try {
-      await request('appointments.save', { ...patientData(), place_id: selectedPlace.id,
-        document_type: type, document_title: document.querySelector('#paperTitle').textContent.trim(),
-        document_text: text, document_date: date });
-      await load();
-      toast('Atendimento salvo no banco de dados.');
+      const saved = await saveAppointmentRecord({
+        type: document.querySelector('.type-card.active')?.dataset.type,
+        title: document.querySelector('#paperTitle').textContent.trim(),
+        text: document.querySelector('#rxText').value.trim(),
+        date: document.querySelector('#rxDate').value
+      });
+      if (saved?.historyReady) toast('Atendimento salvo no histórico do paciente.');
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };

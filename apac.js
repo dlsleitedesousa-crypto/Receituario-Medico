@@ -174,14 +174,19 @@
       cid, diagnosis, notes, professional: doctor.name || '', professionalCpf: doctor.cpf,
       date: date($('#rxDate').value || new Date().toISOString().slice(0, 10))
     };
-    openApacTemplatePdf(values).then(success => {
+    openApacTemplatePdf(values).then(async success => {
       if (!success) return;
       close();
-      printSummaryEntries.push({title:'Solicitação de APAC', patient, cpf:$('#patientDoc').value,
+      const entry = {title:'Solicitação de APAC', patient, cpf:$('#patientDoc').value,
         birthDate:$('#patientBirthDate').value, age:patientAge($('#patientBirthDate').value),
         text:`Procedimento: ${procedure}\nCódigo SIGTAP: ${code}\nQuantidade: ${quantity}\nCID-10: ${cid}\nDiagnóstico: ${diagnosis}\nObservações: ${notes}`,
         date:$('#rxDate').value, professional:doctor.name, place:place.name || '', address:place.address || '',
-        phone:place.phone || '', cnpj:place.cnpj || '', cnes:place.cnes || '', requestedAt:new Date().toLocaleString('pt-BR')});
+        phone:place.phone || '', cnpj:place.cnpj || '', cnes:place.cnes || '', requestedAt:new Date().toLocaleString('pt-BR')};
+      printSummaryEntries.push(entry);
+      try {
+        const saved = await window.saveAppointmentRecord({ type: 'apac', title: entry.title, text: entry.text, date: $('#rxDate').value });
+        if (saved?.historyReady) toast('APAC salva no histórico do paciente.');
+      } catch (error) { toast(error.message || 'Não foi possível salvar a APAC no histórico.'); }
     }).finally(() => { submit.disabled = false; submit.textContent = originalLabel; });
   };
 })();
