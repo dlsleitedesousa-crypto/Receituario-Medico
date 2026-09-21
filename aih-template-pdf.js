@@ -57,7 +57,8 @@ async function createAihTemplatePdf(values, templateBytes, PDFLib) {
   line(values.cid, 287, 313, 82);
   line(values.secondaryCid, 379, 313, 82);
   line(values.associatedCid, 470, 313, 105);
-  line(values.procedure, 42, 275, 397);
+  if (font.widthOfTextAtSize(clean(values.procedure), 6) > 397) block(values.procedure, 42, 278, 397, 2, 6, 7);
+  else line(values.procedure, 42, 275, 397);
   line(values.code, 449, 275, 125);
   line(values.clinic, 64, 252, 66);
   line(values.admission, 140, 252, 112);
