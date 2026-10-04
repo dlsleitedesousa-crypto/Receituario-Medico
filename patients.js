@@ -81,6 +81,33 @@
     card.append(heading, meta, content);
     return card;
   };
+  const renderHistory = (container, items) => {
+    container.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'Nenhum atendimento salvo para este paciente.';
+      container.append(empty);
+      return;
+    }
+    const dates = new Map();
+    items.forEach(item => {
+      const date = String(item.document_date || '').slice(0, 10);
+      if (!dates.has(date)) dates.set(date, []);
+      dates.get(date).push(item);
+    });
+    [...dates.keys()].sort().reverse().forEach(date => {
+      const documents = dates.get(date);
+      const group = document.createElement('details');
+      group.className = 'history-date-group';
+      const summary = document.createElement('summary');
+      summary.textContent = `${date ? formatDate(date) : 'Data não informada'} · ${documents.length} ${documents.length === 1 ? 'documento' : 'documentos'}`;
+      const contents = document.createElement('div');
+      contents.className = 'history-date-documents';
+      documents.forEach(item => contents.append(createHistoryCard(item)));
+      group.append(summary, contents);
+      container.append(group);
+    });
+  };
   const patientNameInput = document.querySelector('#patientName');
   const patientCpfInput = document.querySelector('#patientDoc');
   const patientBirthInput = document.querySelector('#patientBirthDate');
@@ -134,12 +161,7 @@
       historyOverlay.classList.remove('hidden');
       closeHistoryButton.focus();
       const result = await request('patients.history', { id: patient.id });
-      currentHistoryList.replaceChildren();
-      if (!result.items.length) {
-        const empty = document.createElement('p');
-        empty.textContent = 'Nenhum atendimento salvo para este paciente.';
-        currentHistoryList.append(empty);
-      } else result.items.forEach(item => currentHistoryList.append(createHistoryCard(item)));
+      renderHistory(currentHistoryList, result.items);
     } catch (error) { closeCurrentHistory(); notifyError(error); }
     finally { historyButton.disabled = false; }
   };
@@ -254,14 +276,7 @@
     detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
     try {
       const result = await request('patients.history', { id: patient.id });
-      history.replaceChildren();
-      if (!result.items.length) {
-        const empty = document.createElement('p');
-        empty.textContent = 'Nenhum atendimento salvo para este paciente.';
-        history.append(empty);
-        return;
-      }
-      result.items.forEach(item => history.append(createHistoryCard(item)));
+      renderHistory(history, result.items);
     } catch (error) { history.textContent = ''; notifyError(error); }
   };
   document.querySelector('#closePatientDetail').onclick = () => detail.classList.add('hidden');
