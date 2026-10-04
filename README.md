@@ -85,3 +85,7 @@ O botão **AIH** abre um formulário apenas com procedimento principal e código
 ## Histórico de atendimentos
 
 **Salvar atendimento** grava o documento atual e confirma que ele aparece no histórico do paciente. Abrir o PDF de receitas simples ou especiais, atestados, laudos, solicitações de exames ou fisioterapia e documentos personalizados também registra o documento no histórico; voltar da prévia não apaga o texto. Ao gerar o PDF de APAC ou AIH, a solicitação também é registrada. Repetir a impressão do mesmo documento nos cinco minutos seguintes não duplica o registro. Para vincular qualquer atendimento ao paciente, informe nome completo, CPF com 11 dígitos e data de nascimento válida; o resumo temporário de impressões não substitui esse registro no banco.
+
+## Modelos de orçamento
+
+O botão **Modelos de Orçamento** no receituário abre a biblioteca com busca, cadastro, edição e exclusão. Cada modelo contém nome e texto livre para serviços, valores, condições de pagamento e validade. **Usar no receituário** seleciona o tipo **Orçamento** e preenche o documento, que pode ser editado, impresso em PDF e salvo no histórico do paciente. Na produção, os modelos ficam no MySQL vinculados à conta do profissional; no modo local, ficam no navegador. Execute `node --test tests/budget-models.mjs` para verificar os fluxos locais e a integração simulada com a API.

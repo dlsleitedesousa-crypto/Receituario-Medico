@@ -117,7 +117,8 @@
     { category: 'laudo', button: reportModelsButton, list: '#reportModelList', form: '#reportModelForm', name: '#reportModelName', text: '#reportModelText', get: () => reportModels, set: v => reportModels = v, editing: () => editingReportModelId, clear: () => editingReportModelId = null, render: renderReportModels, showForm: showReportModelForm },
     { category: 'atestado', button: certificateModelsButton, list: '#certificateModelList', form: '#certificateModelForm', name: '#certificateModelName', text: '#certificateModelText', get: () => certificateModels, set: v => certificateModels = v, editing: () => editingCertificateModelId, clear: () => editingCertificateModelId = null, render: renderCertificateModels, showForm: showCertificateModelForm },
     { category: 'exame', button: examModelsButton, list: '#examModelList', form: '#examModelForm', name: '#examModelName', text: '#examModelText', get: () => examModels, set: v => examModels = v, editing: () => editingExamModelId, clear: () => editingExamModelId = null, render: renderExamModels, showForm: showExamModelForm },
-    { category: 'fisioterapia', button: physioModelsButton, list: '#physioModelList', form: '#physioModelForm', name: '#physioModelName', text: '#physioModelText', get: () => physioModels, set: v => physioModels = v, editing: () => editingPhysioModelId, clear: () => editingPhysioModelId = null, render: renderPhysioModels, showForm: showPhysioModelForm }
+    { category: 'fisioterapia', button: physioModelsButton, list: '#physioModelList', form: '#physioModelForm', name: '#physioModelName', text: '#physioModelText', get: () => physioModels, set: v => physioModels = v, editing: () => editingPhysioModelId, clear: () => editingPhysioModelId = null, render: renderPhysioModels, showForm: showPhysioModelForm },
+    { category: 'orcamento', button: budgetModelsButton, list: '#budgetModelList', form: '#budgetModelForm', name: '#budgetModelName', text: '#budgetModelText', get: () => budgetModels, set: v => budgetModels = v, editing: () => editingBudgetModelId, clear: () => editingBudgetModelId = null, render: renderBudgetModels, showForm: showBudgetModelForm }
   ];
   const loadModels = async config => {
     const result = await api('models.list', { category: config.category });
@@ -153,7 +154,7 @@
       event.preventDefault(); event.stopImmediatePropagation();
       if (deleteButton.disabled) return;
       const card = deleteButton.closest('article');
-      const id = card?.dataset.model || card?.dataset.reportModel || card?.dataset.certificateModel || card?.dataset.examModel || card?.dataset.physioModel;
+      const id = card?.dataset.model || card?.dataset.reportModel || card?.dataset.certificateModel || card?.dataset.examModel || card?.dataset.physioModel || card?.dataset.budgetModel;
       const model = config.get().find(item => item.id === id);
       if (!model || !confirm(`Excluir o modelo “${model.name}”?`)) return;
       deleteButton.disabled = true;
