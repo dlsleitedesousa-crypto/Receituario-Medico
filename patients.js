@@ -71,7 +71,7 @@
   const formatCpf = value => String(value || '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   const createHistoryCard = item => {
     const card = document.createElement('article');
-    card.className = 'history-card';
+    card.className = item.document_type === 'historia_clinica' ? 'history-card clinical-history-card' : 'history-card';
     const heading = document.createElement('h4');
     heading.textContent = item.document_title;
     const meta = document.createElement('small');
@@ -96,11 +96,13 @@
       dates.get(date).push(item);
     });
     [...dates.keys()].sort().reverse().forEach(date => {
-      const documents = dates.get(date);
+      const documents = [...dates.get(date)].sort((a, b) => Number(b.document_type === 'historia_clinica') - Number(a.document_type === 'historia_clinica'));
+      const documentCount = documents.filter(item => item.document_type !== 'historia_clinica').length;
+      const hasClinicalHistory = documents.some(item => item.document_type === 'historia_clinica');
       const group = document.createElement('details');
       group.className = 'history-date-group';
       const summary = document.createElement('summary');
-      summary.textContent = `${date ? formatDate(date) : 'Data não informada'} · ${documents.length} ${documents.length === 1 ? 'documento' : 'documentos'}`;
+      summary.textContent = `${date ? formatDate(date) : 'Data não informada'} · ${documentCount} ${documentCount === 1 ? 'documento' : 'documentos'}${hasClinicalHistory ? ' · História clínica' : ''}`;
       const contents = document.createElement('div');
       contents.className = 'history-date-documents';
       documents.forEach(item => contents.append(createHistoryCard(item)));
@@ -108,6 +110,11 @@
       container.append(group);
     });
   };
+  const clinicalHistoryInput = document.querySelector('#clinicalHistory');
+  const clearClinicalHistory = () => { clinicalHistoryInput.value = ''; };
+  ['#patientName', '#patientDoc', '#patientBirthDate', '#logoutRx', '#logoutButton'].forEach(selector => {
+    document.querySelector(selector).addEventListener(selector.startsWith('#logout') ? 'click' : 'input', clearClinicalHistory);
+  });
   const patientNameInput = document.querySelector('#patientName');
   const patientCpfInput = document.querySelector('#patientDoc');
   const patientBirthInput = document.querySelector('#patientBirthDate');
@@ -191,6 +198,7 @@
     activeSuggestion = -1;
   };
   const choosePatient = patient => {
+    if (patientCpfInput.value.replace(/\D/g, '') !== patient.cpf) clearClinicalHistory();
     patientNameInput.value = patient.name;
     patientCpfInput.value = formatCpf(patient.cpf);
     patientBirthInput.value = patient.birth_date;
@@ -397,14 +405,15 @@
   const recentAppointments = new Map();
   const saveAppointmentRecord = async ({ type, title, text, date }) => {
     if (!validPatient()) return null;
-    if (!selectedPlace?.id || !type || !title || !text || !date) { toast('Selecione um local e preencha o texto e a data do documento.'); return null; }
+    const clinicalHistory = clinicalHistoryInput.value.trim();
+    if (!selectedPlace?.id || !type || !title || (!text && !clinicalHistory) || !date) { toast('Selecione um local e preencha a data e o texto do documento ou a história clínica.'); return null; }
     const patient = patientData();
-    const key = JSON.stringify([patient.cpf, selectedPlace.id, type, title, text, date]);
+    const key = JSON.stringify([patient.cpf, selectedPlace.id, type, title, text, date, clinicalHistory]);
     const recent = recentAppointments.get(key);
-    if (recent && Date.now() - recent.createdAt < 5 * 60 * 1000) return recent.promise;
+    if (!clinicalHistory && recent && Date.now() - recent.createdAt < 5 * 60 * 1000) return recent.promise;
     const promise = (async () => {
       const saved = await request('appointments.save', { ...patient, place_id: selectedPlace.id,
-        document_type: type, document_title: title, document_text: text, document_date: date });
+        document_type: type, document_title: title, document_text: text, document_date: date, clinical_history: clinicalHistory });
       if (!saved.appointment_id || !saved.patient_id) throw new Error('O servidor não confirmou o registro do atendimento.');
       try {
         await load();
@@ -440,6 +449,6 @@
     } catch (error) { notifyError(error); }
     finally { button.disabled = false; }
   };
-  document.addEventListener('patients:load', () => { recentAppointments.clear(); patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
+  document.addEventListener('patients:load', () => { clearClinicalHistory(); recentAppointments.clear(); patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();

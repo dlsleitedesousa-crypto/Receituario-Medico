@@ -89,3 +89,7 @@ O botão **AIH** abre um formulário apenas com procedimento principal e código
 ## Modelos de orçamento
 
 O botão **Modelos de Orçamento** no receituário abre a biblioteca com busca, cadastro, edição e exclusão. Cada modelo contém nome e texto livre para serviços, valores, condições de pagamento e validade. **Usar no receituário** seleciona o tipo **Orçamento** e preenche o documento, que pode ser editado, impresso em PDF e salvo no histórico do paciente. Na produção, os modelos ficam no MySQL vinculados à conta do profissional; no modo local, ficam no navegador. Execute `node --test tests/budget-models.mjs` para verificar os fluxos locais e a integração simulada com a API.
+
+## História clínica
+
+A seção **História clínica**, após o receituário, fica fora da folha de impressão e do PDF. **Salvar atendimento** grava o texto na data do receituário, inclusive sem documento preenchido. A geração de documentos também salva a história preenchida. No histórico, ela aparece antes dos documentos do dia e não entra na contagem de documentos. Há um registro por paciente, profissional e data; um novo texto substitui o anterior desse dia, e um campo vazio preserva o registro salvo. A gravação ocorre na mesma transação do atendimento, sem migração de tabelas. O campo é limpo ao mudar os dados do paciente ou sair da conta. Execute `node --test tests/clinical-history.mjs` para verificar o fluxo com API simulada, a ordem e a exclusão da impressão.

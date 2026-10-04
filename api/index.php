@@ -311,8 +311,10 @@ try {
             $title = trim((string)($data['document_title'] ?? ''));
             $text = trim((string)($data['document_text'] ?? ''));
             $date = (string)($data['document_date'] ?? '');
+            $clinicalHistory = trim((string)($data['clinical_history'] ?? ''));
+            if (mb_strlen($clinicalHistory) > 100000) respond(['ok' => false, 'error' => 'A história clínica deve ter no máximo 100.000 caracteres.'], 422);
             $documentDate = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
-            if (!in_array($type, ['simples','especial','atestado','laudo','fisioterapia','exame','personalizado','apac','aih','orcamento'], true) || $title === '' || mb_strlen($title) > 180 || $text === '' || !$documentDate || $documentDate->format('Y-m-d') !== $date) {
+            if (!in_array($type, ['simples','especial','atestado','laudo','fisioterapia','exame','personalizado','apac','aih','orcamento'], true) || $title === '' || mb_strlen($title) > 180 || ($text === '' && $clinicalHistory === '') || !$documentDate || $documentDate->format('Y-m-d') !== $date) {
                 respond(['ok' => false, 'error' => 'Preencha o tipo, texto e data do documento.'], 422);
             }
         }
@@ -323,9 +325,33 @@ try {
         $stmt->execute([$userId,$name,$cpf,$birth,$phone]);
         $patientId = (int)$pdo->lastInsertId();
         if ($action === 'appointments.save') {
-            $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,place_name,document_type,document_title,document_text,document_date) VALUES (?,?,?,?,?,?,?,?)');
-            $stmt->execute([$userId,$patientId,$placeId,$place['name'],$type,$title,$text,$date]);
-            $appointmentId = (int)$pdo->lastInsertId();
+            // The patient upsert above serializes concurrent saves for this patient.
+            if ($clinicalHistory !== '') {
+                $stmt = $pdo->prepare("SELECT id FROM appointments WHERE user_id=? AND patient_id=? AND document_date=? AND document_type='historia_clinica' ORDER BY id DESC LIMIT 1 FOR UPDATE");
+                $stmt->execute([$userId,$patientId,$date]);
+                $clinicalId = $stmt->fetchColumn();
+                if ($clinicalId) {
+                    $stmt = $pdo->prepare('UPDATE appointments SET document_text=?,place_id=?,place_name=? WHERE id=? AND user_id=? AND patient_id=?');
+                    $stmt->execute([$clinicalHistory,$placeId,$place['name'],$clinicalId,$userId,$patientId]);
+                    $appointmentId = (int)$clinicalId;
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,place_name,document_type,document_title,document_text,document_date) VALUES (?,?,?,?,?,?,?,?)');
+                    $stmt->execute([$userId,$patientId,$placeId,$place['name'],'historia_clinica','História clínica',$clinicalHistory,$date]);
+                    $appointmentId = (int)$pdo->lastInsertId();
+                }
+            }
+            if ($text !== '') {
+                $stmt = $pdo->prepare('SELECT id FROM appointments WHERE user_id=? AND patient_id=? AND place_id=? AND document_type=? AND document_title=? AND document_text=? AND document_date=? AND created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE) ORDER BY id DESC LIMIT 1');
+                $stmt->execute([$userId,$patientId,$placeId,$type,$title,$text,$date]);
+                $existingDocumentId = $stmt->fetchColumn();
+                if ($existingDocumentId) {
+                    $appointmentId = (int)$existingDocumentId;
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,place_name,document_type,document_title,document_text,document_date) VALUES (?,?,?,?,?,?,?,?)');
+                    $stmt->execute([$userId,$patientId,$placeId,$place['name'],$type,$title,$text,$date]);
+                    $appointmentId = (int)$pdo->lastInsertId();
+                }
+            }
         }
         $pdo->commit();
         respond(['ok' => true, 'patient_id' => $patientId, 'appointment_id' => $appointmentId ?? null]);
