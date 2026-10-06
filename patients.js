@@ -77,7 +77,9 @@
     const meta = document.createElement('small');
     meta.textContent = `Data: ${formatDate(item.document_date)} · Local de atendimento: ${item.place_name || 'Não disponível'}`;
     const content = document.createElement('pre');
-    content.textContent = item.document_text;
+    content.textContent = item.document_type === 'tempo_atendimento'
+      ? 'Início: ' + new Date(item.consultation_started_at.replace(' ', 'T') + 'Z').toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) + '\nTempo de atendimento: ' + formatConsultationDuration(item.consultation_duration_seconds)
+      : item.document_text;
     card.append(heading, meta, content);
     return card;
   };
@@ -97,7 +99,7 @@
     });
     [...dates.keys()].sort().reverse().forEach(date => {
       const documents = [...dates.get(date)].sort((a, b) => Number(b.document_type === 'historia_clinica') - Number(a.document_type === 'historia_clinica'));
-      const documentCount = documents.filter(item => item.document_type !== 'historia_clinica').length;
+      const documentCount = documents.filter(item => !['historia_clinica', 'tempo_atendimento'].includes(item.document_type)).length;
       const hasClinicalHistory = documents.some(item => item.document_type === 'historia_clinica');
       const group = document.createElement('details');
       group.className = 'history-date-group';
@@ -198,7 +200,7 @@
     activeSuggestion = -1;
   };
   const choosePatient = patient => {
-    if (patientCpfInput.value.replace(/\D/g, '') !== patient.cpf) clearClinicalHistory();
+    if (patientCpfInput.value.replace(/\D/g, '') !== patient.cpf) { clearClinicalHistory(); window.consultationTimer?.reset(); }
     patientNameInput.value = patient.name;
     patientCpfInput.value = formatCpf(patient.cpf);
     patientBirthInput.value = patient.birth_date;
@@ -403,17 +405,18 @@
     finally { button.disabled = false; }
   };
   const recentAppointments = new Map();
-  const saveAppointmentRecord = async ({ type, title, text, date }) => {
+  const saveAppointmentRecord = async ({ type, title, text, date, timerOnly = false }) => {
     if (!validPatient()) return null;
-    const clinicalHistory = clinicalHistoryInput.value.trim();
-    if (!selectedPlace?.id || !type || !title || (!text && !clinicalHistory) || !date) { toast('Selecione um local e preencha a data e o texto do documento ou a história clínica.'); return null; }
+    const clinicalHistory = timerOnly ? '' : clinicalHistoryInput.value.trim();
+    const timing = window.consultationTimer?.snapshot() || null;
+    if (!selectedPlace?.id || !type || !title || (!text && !clinicalHistory && !timing) || !date) { toast('Selecione um local e preencha a data e o texto do documento, a história clínica ou inicie o cronômetro.'); return null; }
     const patient = patientData();
     const key = JSON.stringify([patient.cpf, selectedPlace.id, type, title, text, date, clinicalHistory]);
     const recent = recentAppointments.get(key);
-    if (!clinicalHistory && recent && Date.now() - recent.createdAt < 5 * 60 * 1000) return recent.promise;
+    if (!timing && !clinicalHistory && recent && Date.now() - recent.createdAt < 5 * 60 * 1000) return recent.promise;
     const promise = (async () => {
       const saved = await request('appointments.save', { ...patient, place_id: selectedPlace.id,
-        document_type: type, document_title: title, document_text: text, document_date: date, clinical_history: clinicalHistory });
+        document_type: type, document_title: title, document_text: text, document_date: date, clinical_history: clinicalHistory, consultation: timing });
       if (!saved.appointment_id || !saved.patient_id) throw new Error('O servidor não confirmou o registro do atendimento.');
       try {
         await load();

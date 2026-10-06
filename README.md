@@ -101,3 +101,9 @@ O cadastro e Meu perfil permitem informar telefone, título de especialista e im
 A chave “Usar imagem da assinatura”, na aba Receituário, inclui a imagem na identificação do profissional e nas prévias/impressões, inclusive nas duas vias da receita especial. Ela começa desligada e só fica disponível com uma imagem cadastrada. A imagem pode ser substituída ou removida em Meu perfil; cancelar a edição preserva a imagem salva. Trata-se da inserção da imagem da assinatura, sem certificação digital.
 
 A API acrescenta automaticamente as colunas `phone`, `specialistTitle` e `signature` à tabela `users`; imagens e dados dos profissionais permanecem no banco, fora do GitHub. Verifique o fluxo local com `node --test tests/profile-signature.mjs`. A conexão e a migração MySQL devem ser verificadas no ambiente PHP/MySQL da hospedagem.
+
+## Cronômetro do atendimento
+
+No topo do receituário, “Iniciar atendimento” inicia a contagem para o paciente preenchido e o local selecionado. O início e a duração são gravados no histórico ao salvar o atendimento, gerar documentos ou limpar os dados do paciente. O botão de limpar grava a duração final antes de zerar; se a gravação falhar, preserva os dados para nova tentativa. Também é possível salvar somente o tempo, sem documento ou história clínica.
+
+O registro “Tempo de atendimento” exibe o início no fuso America/Fortaleza e a duração em horas, minutos e segundos. Salvamentos repetidos atualizam o mesmo cronômetro, sem duplicá-lo. A API cria as colunas `consultation_started_at` e `consultation_duration_seconds` em `appointments`. O cronômetro fica apenas na sessão aberta do navegador; trocar o paciente, sair da conta ou recarregar a página encerra a contagem local. Execute `node --test tests/consultation-timer.mjs` para conferir os fluxos de tempo, salvamento e limpeza.

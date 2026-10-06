@@ -155,6 +155,9 @@ try {
         INDEX idx_appointments_patient (user_id, patient_id, created_at),
         INDEX idx_appointments_place (user_id, place_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    foreach (['consultation_started_at' => 'DATETIME(3) NULL', 'consultation_duration_seconds' => 'INT UNSIGNED NULL'] as $column => $definition) {
+        if (!$pdo->query("SHOW COLUMNS FROM appointments LIKE '$column'")->fetch()) $pdo->exec("ALTER TABLE appointments ADD COLUMN $column $definition");
+    }
     if (!$pdo->query("SHOW COLUMNS FROM appointments LIKE 'place_name'")->fetch()) {
         $pdo->exec("ALTER TABLE appointments ADD COLUMN place_name VARCHAR(180) NOT NULL DEFAULT '' AFTER place_id");
         $pdo->exec("UPDATE appointments a JOIN places p ON p.id=a.place_id AND p.user_id=a.user_id SET a.place_name=p.name WHERE a.place_name=''");
@@ -289,7 +292,7 @@ try {
         $stmt->execute([$patientId,$userId]);
         $patient = $stmt->fetch();
         if (!$patient) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
-        $stmt = $pdo->prepare("SELECT a.id,a.document_type,a.document_title,a.document_text,a.document_date,a.created_at,COALESCE(NULLIF(a.place_name,''),p.name) AS place_name FROM appointments a LEFT JOIN places p ON p.id=a.place_id AND p.user_id=a.user_id WHERE a.patient_id=? AND a.user_id=? ORDER BY a.created_at DESC,a.id DESC");
+        $stmt = $pdo->prepare("SELECT a.id,a.document_type,a.document_title,a.document_text,a.document_date,a.created_at,a.consultation_started_at,a.consultation_duration_seconds,COALESCE(NULLIF(a.place_name,''),p.name) AS place_name FROM appointments a LEFT JOIN places p ON p.id=a.place_id AND p.user_id=a.user_id WHERE a.patient_id=? AND a.user_id=? ORDER BY a.created_at DESC,a.id DESC");
         $stmt->execute([$patientId,$userId]);
         respond(['ok' => true, 'patient' => $patient, 'items' => $stmt->fetchAll()]);
     }
@@ -340,8 +343,17 @@ try {
             $date = (string)($data['document_date'] ?? '');
             $clinicalHistory = trim((string)($data['clinical_history'] ?? ''));
             if (mb_strlen($clinicalHistory) > 100000) respond(['ok' => false, 'error' => 'A história clínica deve ter no máximo 100.000 caracteres.'], 422);
+            $consultation = $data['consultation'] ?? null;
+            $consultationStart = null;
+            if ($consultation !== null) {
+                if (!is_array($consultation)) respond(['ok' => false, 'error' => 'Dados do cronômetro inválidos.'], 422);
+                $start = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s.v\Z', (string)($consultation['started_at'] ?? ''), new DateTimeZone('UTC'));
+                $duration = $consultation['duration_seconds'] ?? null;
+                if (!$start || $start->format('Y-m-d\TH:i:s.v\Z') !== ($consultation['started_at'] ?? '') || !is_int($duration) || $duration < 0 || $duration > 604800 || $start > new DateTimeImmutable('+5 minutes', new DateTimeZone('UTC'))) respond(['ok' => false, 'error' => 'Hora de início ou duração do atendimento inválida.'], 422);
+                $consultationStart = $start->format('Y-m-d H:i:s.v');
+            }
             $documentDate = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
-            if (!in_array($type, ['simples','especial','atestado','laudo','fisioterapia','exame','personalizado','apac','aih','orcamento'], true) || $title === '' || mb_strlen($title) > 180 || ($text === '' && $clinicalHistory === '') || !$documentDate || $documentDate->format('Y-m-d') !== $date) {
+            if (!in_array($type, ['simples','especial','atestado','laudo','fisioterapia','exame','personalizado','apac','aih','orcamento'], true) || $title === '' || mb_strlen($title) > 180 || ($text === '' && $clinicalHistory === '' && !$consultationStart) || !$documentDate || $documentDate->format('Y-m-d') !== $date) {
                 respond(['ok' => false, 'error' => 'Preencha o tipo, texto e data do documento.'], 422);
             }
         }
@@ -353,6 +365,20 @@ try {
         $patientId = (int)$pdo->lastInsertId();
         if ($action === 'appointments.save') {
             // The patient upsert above serializes concurrent saves for this patient.
+            if ($consultationStart) {
+                $stmt = $pdo->prepare("SELECT id FROM appointments WHERE user_id=? AND patient_id=? AND document_type='tempo_atendimento' AND consultation_started_at=? LIMIT 1 FOR UPDATE");
+                $stmt->execute([$userId,$patientId,$consultationStart]);
+                $timingId = $stmt->fetchColumn();
+                if ($timingId) {
+                    $stmt = $pdo->prepare('UPDATE appointments SET consultation_duration_seconds=GREATEST(consultation_duration_seconds,?),place_id=?,place_name=? WHERE id=? AND user_id=? AND patient_id=?');
+                    $stmt->execute([$duration,$placeId,$place['name'],$timingId,$userId,$patientId]);
+                    $appointmentId = (int)$timingId;
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO appointments (user_id,patient_id,place_id,place_name,document_type,document_title,document_text,document_date,consultation_started_at,consultation_duration_seconds) VALUES (?,?,?,?,?,?,?,?,?,?)');
+                    $stmt->execute([$userId,$patientId,$placeId,$place['name'],'tempo_atendimento','Tempo de atendimento','',$date,$consultationStart,$duration]);
+                    $appointmentId = (int)$pdo->lastInsertId();
+                }
+            }
             if ($clinicalHistory !== '') {
                 $stmt = $pdo->prepare("SELECT id FROM appointments WHERE user_id=? AND patient_id=? AND document_date=? AND document_type='historia_clinica' ORDER BY id DESC LIMIT 1 FOR UPDATE");
                 $stmt->execute([$userId,$patientId,$date]);
