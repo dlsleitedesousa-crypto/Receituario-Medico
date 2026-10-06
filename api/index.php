@@ -36,6 +36,20 @@ function requireUser(): int {
     return (int) $_SESSION['user_id'];
 }
 
+function additionalDoctorFields(array $data): array {
+    $phone = trim((string)($data['phone'] ?? ''));
+    $specialistTitle = trim((string)($data['specialistTitle'] ?? ''));
+    $signature = (string)($data['signature'] ?? '');
+    if (mb_strlen($phone) > 30 || mb_strlen($specialistTitle) > 180) respond(['ok' => false, 'error' => 'Telefone ou título de especialista excede o tamanho permitido.'], 422);
+    if ($signature !== '') {
+        if (strlen($signature) > 2800000 || !preg_match('#^data:image/(png|jpeg);base64,([A-Za-z0-9+/=]+)$#D', $signature, $matches)) respond(['ok' => false, 'error' => 'Envie uma assinatura em PNG ou JPG de até 2 MB.'], 422);
+        $bytes = base64_decode($matches[2], true);
+        $info = $bytes === false ? false : @getimagesizefromstring($bytes);
+        if ($bytes === false || strlen($bytes) > 2 * 1024 * 1024 || !$info || $info['mime'] !== 'image/' . $matches[1] || $info[0] > 4096 || $info[1] > 4096) respond(['ok' => false, 'error' => 'Imagem de assinatura inválida ou muito grande.'], 422);
+    }
+    return ['phone' => $phone, 'specialistTitle' => $specialistTitle, 'signature' => $signature];
+}
+
 function validDoctorCpf(string $cpf): bool {
     if (!preg_match('/^\d{11}$/', $cpf) || preg_match('/^(\d)\1{10}$/', $cpf)) return false;
     for ($length = 9; $length <= 10; $length++) {
@@ -81,6 +95,9 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     if (!$pdo->query("SHOW COLUMNS FROM users LIKE 'cpf'")->fetch()) {
         $pdo->exec("ALTER TABLE users ADD COLUMN cpf CHAR(11) NOT NULL DEFAULT '' AFTER name");
+    }
+    foreach (['phone' => "VARCHAR(30) NOT NULL DEFAULT ''", 'specialistTitle' => "VARCHAR(180) NOT NULL DEFAULT ''", 'signature' => 'MEDIUMTEXT NULL'] as $column => $definition) {
+        if (!$pdo->query("SHOW COLUMNS FROM users LIKE '$column'")->fetch()) $pdo->exec("ALTER TABLE users ADD COLUMN $column $definition");
     }
     $schemaTable = 'places';
     $pdo->exec("CREATE TABLE IF NOT EXISTS places (
@@ -166,10 +183,11 @@ try {
             respond(['ok' => false, 'error' => 'Informe um e-mail válido e senha com pelo menos 8 caracteres.'], 422);
         }
         if (!validDoctorCpf($cpf)) respond(['ok' => false, 'error' => 'Informe um CPF válido.'], 422);
-        $stmt = $pdo->prepare('INSERT INTO users (title,name,cpf,specialty,crm,rqe,email,password_hash) VALUES (?,?,?,?,?,?,?,?)');
+        $extra = additionalDoctorFields($data);
+        $stmt = $pdo->prepare('INSERT INTO users (title,name,cpf,specialty,crm,rqe,email,password_hash,phone,specialistTitle,signature) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([
             trim((string)$data['title']), trim((string)$data['name']), $cpf, trim((string)$data['specialty']),
-            trim((string)$data['crm']), trim((string)$data['rqe']), $email, password_hash($password, PASSWORD_DEFAULT)
+            trim((string)$data['crm']), trim((string)$data['rqe']), $email, password_hash($password, PASSWORD_DEFAULT), ...array_values($extra)
         ]);
         respond(['ok' => true]);
     }
@@ -222,7 +240,8 @@ try {
         foreach (['title' => 8, 'name' => 180, 'cpf' => 11, 'specialty' => 180, 'crm' => 80, 'rqe' => 80, 'email' => 190] as $field => $limit) {
             if (mb_strlen($values[$field]) > $limit) respond(['ok' => false, 'error' => 'O campo ' . $field . ' excede o tamanho permitido.'], 422);
         }
-        $stmt = $pdo->prepare('UPDATE users SET title=?,name=?,cpf=?,specialty=?,crm=?,rqe=?,email=? WHERE id=?');
+        $values = [...$values, ...additionalDoctorFields($data)];
+        $stmt = $pdo->prepare('UPDATE users SET title=?,name=?,cpf=?,specialty=?,crm=?,rqe=?,email=?,phone=?,specialistTitle=?,signature=? WHERE id=?');
         $stmt->execute([...array_values($values), $userId]);
         respond(['ok' => true, 'user' => $values]);
     }

@@ -59,6 +59,7 @@
         specialty: $('#doctorSpecialty').value.trim(),
         crm: $('#doctorCrm').value.trim(),
         rqe: $('#doctorRqe').value.trim(),
+        ...additionalDoctorValues('doctor'),
         email: $('#registerEmail').value.trim(),
         password: $('#registerPassword').value
       });

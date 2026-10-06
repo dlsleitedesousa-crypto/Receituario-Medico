@@ -93,3 +93,11 @@ O botão **Modelos de Orçamento** no receituário abre a biblioteca com busca, 
 ## História clínica
 
 A seção **História clínica**, após o receituário, fica fora da folha de impressão e do PDF. **Salvar atendimento** grava o texto na data do receituário, inclusive sem documento preenchido. A geração de documentos também salva a história preenchida. No histórico, ela aparece antes dos documentos do dia e não entra na contagem de documentos. Há um registro por paciente, profissional e data; um novo texto substitui o anterior desse dia, e um campo vazio preserva o registro salvo. A gravação ocorre na mesma transação do atendimento, sem migração de tabelas. O campo é limpo ao mudar os dados do paciente ou sair da conta. Execute `node --test tests/clinical-history.mjs` para verificar o fluxo com API simulada, a ordem e a exclusão da impressão.
+
+## Dados profissionais e imagem da assinatura
+
+O cadastro e Meu perfil permitem informar telefone, título de especialista e imagem da assinatura (PNG/JPG, até 2 MB e 4096 pixels por lado). O título aparece abaixo do CRM/RQE na identificação dos documentos do receituário. O telefone fica salvo no cadastro profissional.
+
+A chave “Usar imagem da assinatura”, na aba Receituário, inclui a imagem na identificação do profissional e nas prévias/impressões, inclusive nas duas vias da receita especial. Ela começa desligada e só fica disponível com uma imagem cadastrada. A imagem pode ser substituída ou removida em Meu perfil; cancelar a edição preserva a imagem salva. Trata-se da inserção da imagem da assinatura, sem certificação digital.
+
+A API acrescenta automaticamente as colunas `phone`, `specialistTitle` e `signature` à tabela `users`; imagens e dados dos profissionais permanecem no banco, fora do GitHub. Verifique o fluxo local com `node --test tests/profile-signature.mjs`. A conexão e a migração MySQL devem ser verificadas no ambiente PHP/MySQL da hospedagem.
