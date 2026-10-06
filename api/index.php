@@ -173,7 +173,15 @@ $action = (string)($_GET['action'] ?? 'status');
 $data = body();
 
 try {
-    if ($action === 'status') respond(['ok' => true, 'database' => 'connected']);
+    if ($action === 'status') {
+        $user = null;
+        if (!empty($_SESSION['user_id'])) {
+            $stmt = $pdo->prepare('SELECT id,title,name,cpf,specialty,crm,rqe,email,phone,specialistTitle,signature FROM users WHERE id=? LIMIT 1');
+            $stmt->execute([(int)$_SESSION['user_id']]);
+            $user = $stmt->fetch() ?: null;
+        }
+        respond(['ok' => true, 'database' => 'connected', 'authenticated' => $user !== null, 'user' => $user]);
+    }
 
     if ($action === 'register') {
         $email = mb_strtolower(trim((string)($data['email'] ?? '')));
