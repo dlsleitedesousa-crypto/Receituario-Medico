@@ -24,7 +24,10 @@ test('assinatura depende da chave e título aparece depois do CRM/RQE',()=>{
   let output=context.doctorSignature(); assert.ok(!output.includes('<img'));
   assert.ok(output.indexOf('RQE 456')<output.indexOf('Especialista &lt;teste>'));
   $('#useElectronicSignature').checked=true; $('#useElectronicSignature').onchange();
-  assert.ok($('#professionalSignature').innerHTML.includes('<img class="signature-image"'));
+  const signed = $('#professionalSignature').innerHTML;
+  assert.ok(signed.includes('<img class="signature-image"'));
+  assert.ok(signed.indexOf('<img') < signed.indexOf('<div class="signature-details">'));
+  assert.ok(signed.indexOf('<div class="signature-details">') < signed.indexOf('<b>'));
   $('#useElectronicSignature').checked=false;
   assert.ok(!context.doctorSignature().includes('<img'));
 });
