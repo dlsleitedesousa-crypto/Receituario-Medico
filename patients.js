@@ -204,6 +204,7 @@
     patientNameInput.value = patient.name;
     patientCpfInput.value = formatCpf(patient.cpf);
     patientBirthInput.value = patient.birth_date;
+    updatePaperPatient();
     selectedPatientId = patient.id;
     patientNameInput.focus();
     hideSuggestions();
@@ -255,6 +256,7 @@
       patientBirthInput.value = '';
       selectedPatientId = null;
     }
+    updatePaperPatient();
     renderSuggestions();
   });
   patientNameInput.addEventListener('focus', () => {
