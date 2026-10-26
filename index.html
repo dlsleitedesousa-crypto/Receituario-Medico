@@ -290,7 +290,7 @@ function patientPrintDetails(){
 }
 function updatePaperPatient(){
   const name=$('#patientName').value.trim(),details=patientPrintDetails();
-  $('#paperPatient').innerHTML='<b>Paciente:</b> '+safe(name||'N?o informado')+(details?' &nbsp; ? &nbsp; '+details:'');
+  $('#paperPatient').innerHTML='<b>Paciente:</b> '+safe(name||'N\u00e3o informado')+(details?' &nbsp; '+details:'');
 }
 ['#patientName','#patientDoc','#patientBirthDate'].forEach(id=>$(id).addEventListener('input',updatePaperPatient));
 updatePaperPatient();
