@@ -22,7 +22,7 @@ Copie `api/config.example.php` para `api/config.local.php` e preencha as credenc
 
 Todos os sete arquivos que a conexão da Hostinger permitiu ler foram recuperados. O oitavo arquivo listado, `database.sql`, teve sua leitura bloqueada pela Hostinger por conteúdo sensível e não foi incluído. Não houve exportação dos dados do MySQL; este repositório não é um backup do banco.
 
-As instruções originais mencionam dois arquivos `.htaccess`, mas eles não foram listados e não puderam ser recuperados nesses caminhos. Os arquivos `api/download` e `download (1)` contêm regras de Apache; seus nomes não foram alterados durante a cópia.
+As instruções originais mencionam dois arquivos `.htaccess`, mas eles não foram listados e não puderam ser recuperados nesses caminhos. Em 25/10/2026 o `.htaccess` da raiz passou a ser versionado, com `DirectoryIndex index.html index.php` e `Cache-Control: no-cache` para as páginas HTML, evitando que o navegador use uma versão antiga após cada publicação. Os arquivos `api/download` e `download (1)` contêm regras de Apache; seus nomes não foram alterados durante a cópia.
 
 Configurações privadas e backups com dados pessoais não devem ser publicados no GitHub. A sintaxe JavaScript foi verificada; PHP e MySQL precisam de validação em um ambiente com esses serviços.
 

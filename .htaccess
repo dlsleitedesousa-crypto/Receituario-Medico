@@ -1,0 +1,8 @@
+DirectoryIndex index.html index.php
+
+# Obriga o navegador a conferir a página no servidor, para que cada publicação carregue os scripts novos.
+<IfModule mod_headers.c>
+  <FilesMatch "\.html?$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
