@@ -123,7 +123,7 @@
     if (!patient) { toast('Informe o nome do paciente.'); close(); return; }
     const place = selectedPlace || {}, reusableValues = valuesForModel();
     const cidCode = reusableValues.cid.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const values = { ...reusableValues, cid: cidDisplay(cidCode), diagnosis: $('#aihDiagnosis').value, placeName: place.name || '', cnes: place.cnes || '', patient, birthDate: date(document.querySelector('#patientBirthDate').value), professional: doctor.name || '', professionalCpf: doctor.cpf || '', date: date(document.querySelector('#rxDate').value || new Date().toISOString().slice(0, 10)) };
+    const values = { ...reusableValues, cid: cidDisplay(cidCode), diagnosis: $('#aihDiagnosis').value, placeName: place.name || '', cnes: place.cnes || '', patient, birthDate: date(document.querySelector('#patientBirthDate').value), professional: doctor.name || '', professionalCpf: doctor.cpf || '', signature: document.querySelector('#useElectronicSignature').checked ? doctor.signature || '' : '', date: date(document.querySelector('#rxDate').value || new Date().toISOString().slice(0, 10)) };
     const button = event.currentTarget.querySelector('button[type="submit"]'), label = button.textContent;
     button.disabled = true; button.textContent = 'Preparando PDF…';
     try {

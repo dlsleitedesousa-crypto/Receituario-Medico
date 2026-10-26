@@ -172,6 +172,7 @@
       cnes: place.cnes || '', patient,
       birthDate: date($('#patientBirthDate').value), code, procedure, quantity,
       cid, diagnosis, notes, professional: doctor.name || '', professionalCpf: doctor.cpf,
+      signature: $('#useElectronicSignature').checked ? doctor.signature || '' : '',
       date: date($('#rxDate').value || new Date().toISOString().slice(0, 10))
     };
     openApacTemplatePdf(values).then(async success => {

@@ -102,6 +102,7 @@ async function createAihTemplatePdf(values, templateBytes, PDFLib) {
   }
   line(values.professional, 42, 228, 246);
   boxedDate(values.date, [299, 326, 352], 228, 'Data da solicitação');
+  await drawTemplateSignature(pdf, page, values.signature, { x: 384, y: 226, width: 188, height: 12 });
   const accidentY = { transito: 194, trabalho: 180, trajeto: 166 };
   if (accidentY[values.accident]) line('X', 52, accidentY[values.accident], 9);
   line(values.insurer, 198, 190, 228);

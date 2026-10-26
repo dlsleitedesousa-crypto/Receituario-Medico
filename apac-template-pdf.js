@@ -1,4 +1,14 @@
 /* Preenche o modelo PDF fornecido pelo usuário, preservando sua página original. */
+// Centraliza a assinatura eletrônica dentro do quadro de assinatura, mantendo a proporção da imagem.
+async function drawTemplateSignature(document, page, signature, box) {
+  const match = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.exec(signature || '');
+  if (!match) return;
+  const image = match[1] === 'png' ? await document.embedPng(signature) : await document.embedJpg(signature);
+  const scale = Math.min(box.width / image.width, box.height / image.height);
+  const width = image.width * scale, height = image.height * scale;
+  page.drawImage(image, { x: box.x + (box.width - width) / 2, y: box.y + (box.height - height) / 2, width, height });
+}
+
 async function createApacTemplatePdf(values, templateBytes, PDFLib) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
   const document = await PDFDocument.load(templateBytes);
@@ -96,6 +106,7 @@ async function createApacTemplatePdf(values, templateBytes, PDFLib) {
     const center = 152.5 + index * 15.5;
     page.drawText(digit, { x: center - font.widthOfTextAtSize(digit, 9) / 2, y: 189, size: 9, font, color });
   });
+  await drawTemplateSignature(document, page, values.signature, { x: 384, y: 187, width: 170, height: 34 });
   document.setTitle('Laudo para Solicitação/Autorização de Procedimento Ambulatorial');
   return document.save();
 }
@@ -136,4 +147,4 @@ async function openApacTemplatePdf(values) {
   }
 }
 
-if (typeof module !== 'undefined') module.exports = { createApacTemplatePdf };
+if (typeof module !== 'undefined') module.exports = { createApacTemplatePdf, drawTemplateSignature };
