@@ -17,6 +17,7 @@ final class TestDatabase extends PDO {
     public function exec(string $statement): int|false {
         if (str_contains($statement, 'CREATE TABLE IF NOT EXISTS signed_documents')) $statement = 'CREATE TABLE IF NOT EXISTS signed_documents (id INTEGER PRIMARY KEY,user_id INTEGER,public_id TEXT UNIQUE,secret_hash TEXT,doc_type TEXT,status TEXT,sha256 TEXT,created_at TEXT,signed_at TEXT)';
         if (str_contains($statement, 'CREATE TABLE IF NOT EXISTS signature_rate_limits')) $statement = 'CREATE TABLE IF NOT EXISTS signature_rate_limits (bucket TEXT PRIMARY KEY,attempts INTEGER,expires_at TEXT)';
+        if (str_contains($statement, 'CREATE TABLE IF NOT EXISTS signature_psc_sessions')) $statement = 'CREATE TABLE IF NOT EXISTS signature_psc_sessions (user_id INTEGER PRIMARY KEY,psc TEXT,state_hash TEXT UNIQUE,token TEXT,status TEXT,expires_at TEXT,created_at TEXT)';
         return parent::exec($this->translate($statement));
     }
     private function translate(string $sql): string {
@@ -37,14 +38,17 @@ function upload(string $bytes): array {
 
 $storage = sys_get_temp_dir() . '/flow-signature-test-' . bin2hex(random_bytes(4));
 $config = signatureConfig();
-$config = array_merge($config, ['client_id' => 'app', 'client_secret' => 'secret', 'storage_dir' => $storage, 'token_url' => 'https://token.test/jwt', 'hub_url' => 'https://hub.test']);
+$config = array_merge($config, ['client_id' => 'app', 'client_secret' => 'secret', 'storage_dir' => $storage, 'token_url' => 'https://token.test/jwt', 'hub_url' => 'https://hub.test', 'integra_url' => 'https://integra.test/api/service']);
 $signedPdf = "%PDF-1.7\n1 0 obj << /Type /Sig /ByteRange [0 10 20 30] /Contents <3082> >> endobj\n%%EOF";
 $calls = [];
 $replies = [];
-$http = function (string $url, array $headers, array|string $body) use (&$calls, &$replies, $signedPdf): array {
+$http = function (string $url, array $headers, array|string|null $body) use (&$calls, &$replies, $signedPdf): array {
     $calls[] = ['url' => $url, 'headers' => $headers, 'body' => $body];
     if ($replies) return array_shift($replies);
     if (str_ends_with($url, '/jwt')) return ['status' => 200, 'body' => json_encode(['access_token' => 'jwt-' . count($calls), 'expires_in' => 300])];
+    if (str_contains($url, '/psc/list?cpf=')) return ['status' => 200, 'body' => '[]'];
+    if (str_ends_with($url, '/psc/list')) return ['status' => 200, 'body' => json_encode([['name' => 'Vidaas'], ['name' => 'BirdID'], ['name' => '<script>']])];
+    if (str_ends_with($url, '/psc/link')) return ['status' => 200, 'body' => json_encode(['token' => 'psc-token-123', 'url' => 'https://api.birdid.com.br/v0/oauth/authorize?state=x'])];
     return ['status' => 200, 'body' => json_encode([base64_encode($signedPdf)])];
 };
 $db = new TestDatabase();
@@ -58,6 +62,12 @@ $r = call(fn() => handleDigitalSignature($db, 1, 'signature.status', [], [], ['c
 check($r->data === ['ok' => true, 'enabled' => false], 'Status reports missing configuration');
 check(call(fn() => handleDigitalSignature($db, 1, 'signature.prepare', ['type' => 'laudo'], [], ['client_id' => '', 'client_secret' => '', 'storage_dir' => ''], $http))->status === 503, 'Unconfigured server refuses signing');
 check(call(fn() => handleDigitalSignature($db, 1, 'signature.status', [], [], $config, $http))->data['enabled'] === true, 'Status reports configuration');
+// Remove os caches de token e de lista de PSCs para medir as chamadas à BRy.
+$clearCache = function () use ($storage): void {
+    foreach (array_diff(scandir($storage) ?: [], ['.', '..']) as $name) if (str_starts_with($name, '.')) unlink($storage . '/' . $name);
+};
+$clearCache();
+$calls = [];
 check(call(fn() => handleDigitalSignature($db, 1, 'signature.prepare', ['type' => 'orcamento'], [], $config, $http))->status === 422, 'Reject unsupported document type');
 
 $draft = call(fn() => handleDigitalSignature($db, 1, 'signature.prepare', ['type' => 'laudo'], [], $config, $http))->data;
@@ -76,7 +86,7 @@ check($calls === [], 'Invalid requests never reach BRy');
 $r = $sign(1, ['public_id' => $draft['public_id'], 'pin' => 'p1n-ok'], upload('%PDF-1.4 original'));
 check($r->status === 200 && $r->data['file_url'] === 'api/index.php?action=signature.file&id=' . $draft['public_id'], 'Successful signature');
 check(count($calls) === 2 && $calls[0]['url'] === 'https://token.test/jwt', 'Token requested first');
-parse_str($calls[0]['body'], $tokenRequest);
+parse_str((string)$calls[0]['body'], $tokenRequest);
 check($tokenRequest === ['grant_type' => 'client_credentials', 'client_id' => 'app', 'client_secret' => 'secret'], 'Client credentials grant');
 $request = $calls[1];
 check($request['url'] === 'https://hub.test/fw/v1/pdf/kms/lote/assinaturas', 'HUB Signer KMS endpoint');
@@ -116,6 +126,62 @@ check($r->status === 502, 'Unsigned BRy response rejected');
 check($db->query("SELECT status FROM signed_documents WHERE public_id='{$fourth['public_id']}'")->fetchColumn() === 'draft', 'Failed signatures stay as drafts');
 check($sign(2, ['public_id' => call(fn() => handleDigitalSignature($db, 2, 'signature.prepare', ['type' => 'laudo'], [], $config, $http))->data['public_id'], 'pin' => '1'], upload('%PDF-1.4 e'))->status === 422, 'Doctor CPF required');
 
+// Multi-PSC: lista, conexão OAuth pelo Integra BRy, retorno com state e assinatura com kms_type PSC.
+$clearCache();
+$calls = [];
+$status = call(fn() => handleDigitalSignature($db, 1, 'signature.status', [], [], $config, $http))->data;
+check($status['pscs'] === ['Vidaas', 'BirdID'] && $status['psc_session'] === null, 'PSC list falls back to all providers and drops invalid names');
+check(str_contains($calls[1]['url'], '/psc/list?cpf=52998224725') && str_ends_with($calls[2]['url'], '/psc/list') && $calls[1]['body'] === null, 'PSC list filtered by doctor CPF first');
+$calls = [];
+call(fn() => handleDigitalSignature($db, 1, 'signature.status', [], [], $config, $http));
+check($calls === [], 'PSC list cached');
+check(call(fn() => handleDigitalSignature($db, 1, 'signature.psc.connect', ['psc' => 'Inexistente'], [], $config, $http))->status === 422, 'Unknown PSC refused');
+check(call(fn() => handleDigitalSignature($db, 2, 'signature.psc.connect', ['psc' => 'BirdID'], [], $config, $http))->status === 422, 'PSC connection needs doctor CPF');
+$connect = call(fn() => handleDigitalSignature($db, 1, 'signature.psc.connect', ['psc' => 'BirdID'], [], $config, $http));
+check($connect->status === 200 && $connect->data['url'] === 'https://api.birdid.com.br/v0/oauth/authorize?state=x', 'Authorization URL returned');
+$link = end($calls);
+check($link['url'] === 'https://integra.test/api/service/psc/link' && in_array('Content-Type: application/json', $link['headers'], true), 'Integra link endpoint');
+$linkBody = json_decode($link['body'], true);
+check($linkBody['pscName'] === 'BirdID' && $linkBody['redirectUri'] === 'https://receita.drdanielleite.com.br/psc/retorno' && $linkBody['scope'] === 'signature_session' && $linkBody['lifetime'] === 28800 && $linkBody['cpf'] === '52998224725', 'Link payload');
+$state = $linkBody['state'];
+$stored = $db->query('SELECT token,status FROM signature_psc_sessions WHERE user_id=1')->fetch();
+check($stored['status'] === 'pending' && !str_contains($stored['token'], 'psc-token-123') && pscDecrypt($config, $stored['token']) === 'psc-token-123', 'PSC token stored encrypted');
+check(call(fn() => handleDigitalSignature($db, 1, 'signature.status', [], [], $config, $http))->data['psc_session']['status'] === 'pending', 'Pending authorization reported');
+$pscDraft = call(fn() => handleDigitalSignature($db, 1, 'signature.prepare', ['type' => 'laudo'], [], $config, $http))->data;
+$r = $sign(1, ['public_id' => $pscDraft['public_id'], 'method' => 'psc'], upload('%PDF-1.4 psc'));
+check($r->status === 409 && $r->data['reconnect'] === true, 'Pending PSC cannot sign');
+$back = fn(array $query) => call(fn() => finishPscAuthorization($db, $query));
+check($back(['state' => str_repeat('0', 48)])->status === 404, 'Unknown state refused');
+check(!str_contains($back(['state' => '<b>'])->body, '<b>'), 'Return page escapes input');
+$r = $back(['state' => $state]);
+check($r->status === 200 && str_contains($r->body, 'BirdID') && str_contains($r->body, 'BroadcastChannel'), 'Authorization completed');
+check($back(['state' => $state])->status === 404, 'State used once');
+$session = call(fn() => handleDigitalSignature($db, 1, 'signature.status', [], [], $config, $http))->data['psc_session'];
+check($session['psc'] === 'BirdID' && $session['status'] === 'active' && str_ends_with($session['expires_at'], 'Z'), 'Active PSC session reported');
+$calls = [];
+$r = $sign(1, ['public_id' => $pscDraft['public_id'], 'method' => 'psc'], upload('%PDF-1.4 psc'));
+check($r->status === 200, 'Signed with PSC');
+$request = end($calls);
+check(in_array('kms_type: PSC', $request['headers'], true), 'PSC kms_type header');
+check(json_decode($request['body']['dados_assinatura'], true)['kms_data'] === ['url' => 'https://integra.test/api/service', 'token' => 'psc-token-123'], 'PSC kms_data uses Integra URL and token');
+$pscDraft = call(fn() => handleDigitalSignature($db, 1, 'signature.prepare', ['type' => 'laudo'], [], $config, $http))->data;
+$replies = [['status' => 403, 'body' => json_encode(['message' => 'Token expirado'])]];
+$r = $sign(1, ['public_id' => $pscDraft['public_id'], 'method' => 'psc'], upload('%PDF-1.4 psc'));
+check($r->status === 409 && $r->data['reconnect'] === true && !$db->query('SELECT COUNT(*) FROM signature_psc_sessions')->fetchColumn(), 'Expired PSC token asks for reconnection');
+call(fn() => handleDigitalSignature($db, 1, 'signature.psc.connect', ['psc' => 'Vidaas'], [], $config, $http));
+$state = json_decode(end($calls)['body'], true)['state'];
+$r = $back(['state' => $state, 'error' => 'access_denied', 'error_description' => 'Usuário cancelou']);
+check($r->status === 400 && str_contains($r->body, 'Usuário cancelou') && !$db->query('SELECT COUNT(*) FROM signature_psc_sessions')->fetchColumn(), 'Denied authorization removed');
+call(fn() => handleDigitalSignature($db, 1, 'signature.psc.connect', ['psc' => 'Vidaas'], [], $config, $http));
+$state = json_decode(end($calls)['body'], true)['state'];
+$db->exec("UPDATE signature_psc_sessions SET created_at='2000-01-01 00:00:00'");
+check($back(['state' => $state])->status === 404 && call(fn() => handleDigitalSignature($db, 1, 'signature.status', [], [], $config, $http))->data['psc_session'] === null, 'Stale pending authorization expires');
+call(fn() => handleDigitalSignature($db, 1, 'signature.psc.connect', ['psc' => 'Vidaas'], [], $config, $http));
+$back(['state' => json_decode(end($calls)['body'], true)['state']]);
+$r = call(fn() => handleDigitalSignature($db, 1, 'signature.sign', ['public_id' => $pscDraft['public_id'], 'method' => 'psc'], upload('%PDF-1.4 psc'), ['client_secret' => 'rotated'] + $config, $http));
+check($r->status === 409 && $r->data['reconnect'] === true, 'Rotated secret requires reconnection');
+check(call(fn() => handleDigitalSignature($db, 1, 'signature.psc.disconnect', [], [], $config, $http))->status === 200 && !$db->query('SELECT COUNT(*) FROM signature_psc_sessions')->fetchColumn(), 'Disconnect removes PSC session');
+
 $validate = fn(array $query) => call(fn() => validateSignedDocument($db, $query, $config));
 $_SERVER['REMOTE_ADDR'] = '203.0.113.5';
 $r = $validate(['id' => $draft['public_id']]);
@@ -141,4 +207,4 @@ unset($_SERVER['DOCUMENT_ROOT']);
 
 foreach (array_diff(scandir($storage) ?: [], ['.', '..']) as $name) unlink($storage . '/' . $name);
 rmdir($storage);
-echo "PASS: configuração, rascunho, envio à BRy, token, erros, armazenamento privado, download e validação pública.\n";
+echo "PASS: configuração, rascunho, envio à BRy, token, erros, Multi-PSC (lista, OAuth, retorno, expiração), armazenamento privado, download e validação pública.\n";

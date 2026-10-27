@@ -233,6 +233,10 @@ try {
         require_once __DIR__ . '/digital-signature.php';
         validateSignedDocument($pdo, $_GET);
     }
+    if ($action === 'psc-retorno') {
+        require_once __DIR__ . '/digital-signature.php';
+        finishPscAuthorization($pdo, $_GET);
+    }
 
     $userId = requireUser();
 

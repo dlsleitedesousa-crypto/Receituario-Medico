@@ -11,4 +11,6 @@ DirectoryIndex index.html index.php
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteRule ^v/([a-f0-9]{32})$ api/index.php?action=validar&id=$1 [QSA,L]
+  # Retorno da autorização do certificado em nuvem (BirdID, VIDaaS etc.) pelo Integra BRy.
+  RewriteRule ^psc/retorno$ api/index.php?action=psc-retorno [QSA,L]
 </IfModule>
