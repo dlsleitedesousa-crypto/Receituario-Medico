@@ -15,7 +15,8 @@ function loadPdfLibraries() {
   ]).catch(error => { pdfLibraries = undefined; throw error; });
   return pdfLibraries;
 }
-async function createPreviewPdf(preview) {
+// footerHeight reserva uma faixa no pé de cada página; decorate desenha nela antes de gerar o arquivo.
+async function createPreviewPdf(preview, { footerHeight = 0, decorate } = {}) {
   await loadPdfLibraries();
   await document.fonts.ready;
   const pages = [...preview.querySelectorAll(':scope > .paper, :scope > .special-sheet, :scope > .apac-sheet')];
@@ -38,11 +39,12 @@ async function createPreviewPdf(preview) {
     });
     if (index) pdf.addPage('a4', 'portrait');
     // Cada folha vira uma página física, inclusive as duas vias especiais.
-    const factor = Math.min(210 / canvas.width, 297 / canvas.height);
+    const factor = Math.min(210 / canvas.width, (297 - footerHeight) / canvas.height);
     const width = canvas.width * factor, height = canvas.height * factor;
     pdf.addImage(canvas, 'JPEG', (210 - width) / 2, 0, width, height, undefined, 'FAST');
     canvas.width = 0; canvas.height = 0;
   }
+  if (decorate) decorate(pdf);
   return pdf.output('blob');
 }
 async function printPreviewPdf(preview) {

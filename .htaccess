@@ -6,3 +6,9 @@ DirectoryIndex index.html index.php
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 </IfModule>
+
+# Link curto do QR Code de validação dos documentos assinados digitalmente.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^v/([a-f0-9]{32})$ api/index.php?action=validar&id=$1 [QSA,L]
+</IfModule>

@@ -229,7 +229,18 @@ try {
         finishPasswordReset($pdo, $data);
     }
 
+    if ($action === 'validar') {
+        require_once __DIR__ . '/digital-signature.php';
+        validateSignedDocument($pdo, $_GET);
+    }
+
     $userId = requireUser();
+
+    if (str_starts_with($action, 'signature.')) {
+        require_once __DIR__ . '/digital-signature.php';
+        // signature.sign chega em multipart/form-data, com o PDF em $_FILES.
+        handleDigitalSignature($pdo, $userId, $action, $data + $_POST, $_FILES);
+    }
 
     if (str_starts_with($action, 'medicines.')) {
         require_once __DIR__ . '/medicines.php';

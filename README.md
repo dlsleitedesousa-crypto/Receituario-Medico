@@ -102,6 +102,18 @@ A chave “Usar imagem da assinatura”, na aba Receituário, inclui a imagem na
 
 A API acrescenta automaticamente as colunas `phone`, `specialistTitle` e `signature` à tabela `users`; imagens e dados dos profissionais permanecem no banco, fora do GitHub. Verifique o fluxo local com `node --test tests/profile-signature.mjs`. A conexão e a migração MySQL devem ser verificadas no ambiente PHP/MySQL da hospedagem.
 
+## Assinatura digital ICP-Brasil (BRy)
+
+Na prévia de receitas simples e especiais, atestados, laudos e solicitações de exames ou fisioterapia, **Assinar digitalmente** pede o PIN do certificado em nuvem do médico (BRy KMS) e gera o PDF com uma faixa de 30 mm no pé das folhas. Na última página, o sistema desenha o QR Code de validação e o código impresso (`XXXX-XXXX`) **antes** da assinatura, porque qualquer alteração posterior invalidaria o PAdES. O servidor envia o PDF à API HUB Signer da BRy (`POST /fw/v1/pdf/kms/lote/assinaturas`), com o perfil `TIMESTAMP`, ou seja, PAdES com carimbo do tempo. A BRy desenha o carimbo do profissional (imagem da assinatura do perfil, nome e CPF do certificado) no canto inferior direito da última página. O PDF assinado abre em outra aba, e o documento é registrado no histórico do paciente.
+
+A assinatura é síncrona: a resposta da BRy já traz o arquivo assinado, sem webhook. O PIN não é gravado nem registrado em log. O token JWT da aplicação fica em cache até expirar e é renovado uma vez se a BRy responder 401.
+
+O QR aponta para `https://receita.drdanielleite.com.br/v/{id}`, regra de `.htaccess` que leva a `api/index.php?action=validar`. O [validar.iti.gov.br](https://validar.iti.gov.br/) acrescenta `format` e `secretCode`; com o código correto, recebe `{"url": …}` e baixa o PDF assinado. Quem lê o QR pela câmera vê uma página que pede o código. Sem o código não há acesso ao arquivo, a página pública não mostra dados do paciente e há limite de 20 tentativas erradas por IP e hora.
+
+Configuração no servidor: copie `api/bry.example.php` para `api/bry.local.php` (privado, fora do GitHub) e preencha `client_id` e `client_secret` da aplicação criada em cloud.bry.com.br. Informe também `storage_dir`, uma pasta **fora** da pasta pública do site; a API recusa pastas dentro dela. Comece em `homologacao` e confirme com a BRy o endereço do HUB de homologação e o perfil desejado (`TIMESTAMP` ou `ADRT` com `policy_oid`). Enquanto o arquivo não existir, o botão não aparece. O médico precisa do CPF em Meu perfil e de um certificado no BRy KMS; certificados VIDaaS/BirdID (PSC) e gov.br não estão implementados.
+
+A tabela `signed_documents` guarda apenas o identificador público, o hash do código, o tipo, o SHA-256 e as datas; os PDFs ficam em `storage_dir`. Esses arquivos são documentos de pacientes: inclua a pasta nos backups privados do servidor e nunca no GitHub. Testes: `php tests/digital-signature.php` (SQLite e BRy simulada) e `node --test tests/digital-signature.mjs`.
+
 ## Cronômetro do atendimento
 
 No topo do receituário, “Iniciar atendimento” inicia a contagem para o paciente preenchido e o local selecionado. O início e a duração são gravados no histórico ao salvar o atendimento, gerar documentos ou limpar os dados do paciente. O botão de limpar grava a duração final antes de zerar; se a gravação falhar, preserva os dados para nova tentativa. Também é possível salvar somente o tempo, sem documento ou história clínica.

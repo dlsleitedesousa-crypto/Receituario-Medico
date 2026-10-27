@@ -16,6 +16,9 @@
 # Configuração privada do SMTP
 /api/mail.local.php
 
+# Credenciais privadas da BRy
+/api/bry.local.php
+
 # Arquivo bruto SIGTAP usado apenas para gerar o catálogo
 /sigtap-*.zip
 
