@@ -5,20 +5,21 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../digital-signature.js', import.meta.url), 'utf8');
 const qrSource = readFileSync(new URL('../vendor/qrcode-generator-1.4.4.js', import.meta.url), 'utf8');
 const DRAFT = { ok: true, public_id: 'a'.repeat(32), code: 'ABCD-2345', validation_url: 'https://receita.drdanielleite.com.br/v/' + 'a'.repeat(32) };
-function setup({ type = 'laudo', enabled = true, statuses = [], signReply } = {}) {
-  const requests = [];
+const tick = () => new Promise(resolve => setTimeout(resolve));
+async function setup({ type = 'laudo', enabled = true, statuses = [], signReply } = {}) {
+  const requests = [], queue = [];
   const confirm = { before(node) { this.inserted = node; } };
-  const preview = { isConnected: true, signButton: null, querySelector: selector => ({ '#signDigital': confirm.inserted || preview.signButton, '#confirmPrint': confirm })[selector] ?? null };
+  const preview = { querySelector: selector => ({ '#signDigital': confirm.inserted, '#confirmPrint': confirm })[selector] ?? null };
   const elements = { '#printRx': { onclick: () => { elements.opened = true; } }, '.type-card.active': { dataset: { type } }, '#printPreview': preview };
   const context = vm.createContext({
     location: { hostname: 'receita.drdanielleite.com.br' }, URL, FormData, Blob, setTimeout,
-    document: { baseURI: 'https://receita.drdanielleite.com.br/', head: { append() {} }, createElement: () => ({}) },
+    document: { baseURI: 'https://receita.drdanielleite.com.br/', head: { append() {} }, createElement: () => ({}), addEventListener() {} },
     $: selector => elements[selector], toast() {}, safe: value => String(value),
     createPreviewPdf: async (target, options) => { requests.push({ pdf: options }); return new Blob(['%PDF-1.4']); },
     fetch: async (url, init) => {
       const action = new URL(url, 'https://x/').searchParams.get('action');
       requests.push({ action, body: init.body });
-      const reply = action === 'signature.status' ? (statuses.shift() || { ok: true, enabled, pscs: [], psc_session: null })
+      const reply = action === 'signature.status' ? (queue.shift() || { ok: true, enabled, pscs: [], psc_session: null })
         : action === 'signature.prepare' ? DRAFT
         : signReply || { ok: true, file_url: 'api/index.php?action=signature.file&id=' + 'a'.repeat(32) };
       return { ok: reply.ok, json: async () => reply };
@@ -27,10 +28,14 @@ function setup({ type = 'laudo', enabled = true, statuses = [], signReply } = {}
   context.window = context;
   vm.runInContext(qrSource, context);
   vm.runInContext(source, context);
+  await tick();
+  // O carregamento já consultou o status; os testes medem apenas as chamadas seguintes.
+  queue.push(...statuses);
+  requests.length = 0;
   return { context, preview, confirm, requests, elements, api: context.digitalSignature };
 }
-test('QR Code e código de validação ficam na faixa do rodapé da última página', () => {
-  const t = setup(), calls = { rects: [], texts: [], page: null };
+test('QR Code e código de validação ficam na faixa do rodapé da última página', async () => {
+  const t = await setup(), calls = { rects: [], texts: [], page: null };
   const pdf = { getNumberOfPages: () => 2, setPage(page) { calls.page = page; }, setFillColor() {}, setTextColor() {}, setFont() {}, setFontSize() {},
     rect(x, y, w, h, style) { calls.rects.push({ x, y, w, h, style }); }, text(value, x, y) { calls.texts.push({ value, x, y }); } };
   t.api.drawValidationFooter(pdf, { url: 'https://receita.drdanielleite.com.br/v/' + 'b'.repeat(32), code: 'WXYZ-2345' });
@@ -42,56 +47,53 @@ test('QR Code e código de validação ficam na faixa do rodapé da última pág
   assert.match(text, /validar\.iti\.gov\.br/);
   assert.ok(calls.texts.every(item => item.y > 270 && item.y < 297 && item.x > 34));
 });
-test('BRy KMS envia PIN; PDF tem rodapé reservado e QR do rascunho', async () => {
-  const t = setup();
-  const result = await t.api.signDocument({}, { method: 'kms', pin: '123456' });
+test('assinatura com o certificado em nuvem envia o PDF com rodapé, sem PIN', async () => {
+  const t = await setup();
+  const result = await t.api.signDocument({});
   assert.deepEqual(t.requests.filter(item => item.action).map(item => item.action), ['signature.prepare', 'signature.sign']);
   assert.equal(JSON.parse(t.requests[0].body).type, 'laudo');
   assert.equal(t.requests[1].pdf.footerHeight, 30);
   const form = t.requests[2].body;
   assert.equal(form.get('public_id'), 'a'.repeat(32));
-  assert.equal(form.get('method'), 'kms');
-  assert.equal(form.get('pin'), '123456');
+  assert.equal(form.get('method'), 'psc');
+  assert.equal(form.has('pin'), false);
   assert.equal(form.get('document').name, 'documento.pdf');
   assert.deepEqual({ ...result }, { code: 'ABCD-2345', fileUrl: 'https://receita.drdanielleite.com.br/api/index.php?action=signature.file&id=' + 'a'.repeat(32) });
 });
-test('PSC assina sem enviar PIN', async () => {
-  const t = setup();
-  await t.api.signDocument({}, { method: 'psc', pin: 'não deve ir' });
-  const form = t.requests[2].body;
-  assert.equal(form.get('method'), 'psc');
-  assert.equal(form.has('pin'), false);
+test('BRy KMS continua aceitando PIN pela API', async () => {
+  const t = await setup();
+  await t.api.signDocument({}, { method: 'kms', pin: '123456' });
+  assert.equal(t.requests[2].body.get('pin'), '123456');
 });
 test('recusa da BRy chega com o motivo e o pedido de reconexão', async () => {
-  const t = setup({ signReply: { ok: false, error: 'A autorização do certificado em nuvem expirou. Conecte novamente.', reconnect: true } });
-  await assert.rejects(t.api.signDocument({}, { method: 'psc' }), error => error.message.includes('expirou') && error.result.reconnect === true);
+  const t = await setup({ signReply: { ok: false, error: 'A autorização do certificado em nuvem expirou. Conecte novamente.', reconnect: true } });
+  await assert.rejects(t.api.signDocument({}), error => error.message.includes('expirou') && error.result.reconnect === true);
 });
-test('espera a autorização do PSC até a sessão ficar ativa', async () => {
+test('espera a autenticação no provedor até a conexão ficar ativa', async () => {
   const pending = { ok: true, enabled: true, pscs: ['BirdID'], psc_session: { psc: 'BirdID', status: 'pending' } };
-  const t = setup({ statuses: [pending, pending, { ...pending, psc_session: { psc: 'BirdID', status: 'active' } }] });
+  const t = await setup({ statuses: [pending, pending, { ...pending, psc_session: { psc: 'BirdID', status: 'active' } }] });
   assert.equal(await t.api.waitForPsc('BirdID', { interval: 1, timeout: 1000 }), true);
   assert.equal(t.requests.length, 3);
 });
-test('autorização recusada, outro provedor, prazo esgotado ou modal fechado encerram a espera', async () => {
-  assert.equal(await setup({ statuses: [{ ok: true, psc_session: null }] }).api.waitForPsc('BirdID', { interval: 1 }), false);
-  assert.equal(await setup({ statuses: [{ ok: true, psc_session: { psc: 'Vidaas', status: 'active' } }] }).api.waitForPsc('BirdID', { interval: 1 }), false);
+test('autenticação recusada, outro provedor, prazo esgotado ou cancelamento encerram a espera', async () => {
+  assert.equal(await (await setup({ statuses: [{ ok: true, psc_session: null }] })).api.waitForPsc('BirdID', { interval: 1 }), false);
+  assert.equal(await (await setup({ statuses: [{ ok: true, psc_session: { psc: 'Vidaas', status: 'active' } }] })).api.waitForPsc('BirdID', { interval: 1 }), false);
   const pending = () => ({ ok: true, psc_session: { psc: 'BirdID', status: 'pending' } });
-  const slow = setup({ statuses: Array.from({ length: 50 }, pending) });
+  const slow = await setup({ statuses: Array.from({ length: 50 }, pending) });
   assert.equal(await slow.api.waitForPsc('BirdID', { interval: 1, timeout: 20 }), false);
-  const closed = setup({ statuses: [pending()] });
-  assert.equal(await closed.api.waitForPsc('BirdID', { interval: 1, cancelled: () => true }), false);
-  assert.equal(closed.requests.length, 0);
+  const cancelled = await setup({ statuses: [pending()] });
+  assert.equal(await cancelled.api.waitForPsc('BirdID', { interval: 1, cancelled: () => true }), false);
+  assert.equal(cancelled.requests.length, 0);
 });
-test('botão aparece só em documentos assináveis e com o servidor configurado', async () => {
-  const t = setup();
+test('botão da prévia aparece só em documentos assináveis e com o servidor configurado', async () => {
+  const t = await setup();
   t.elements['#printRx'].onclick();
   assert.equal(t.elements.opened, true);
-  await new Promise(resolve => setTimeout(resolve));
   assert.equal(t.confirm.inserted.id, 'signDigital');
-  const budget = setup({ type: 'orcamento' });
-  await budget.api.addSignButton();
+  const budget = await setup({ type: 'orcamento' });
+  budget.api.addSignButton();
   assert.equal(budget.confirm.inserted, undefined);
-  const disabled = setup({ enabled: false });
-  await disabled.api.addSignButton();
+  const disabled = await setup({ enabled: false });
+  disabled.api.addSignButton();
   assert.equal(disabled.confirm.inserted, undefined);
 });

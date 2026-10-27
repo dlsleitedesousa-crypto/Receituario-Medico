@@ -9,6 +9,6 @@ return [
     // 'hub_url' => 'https://hub2.hom.bry.com.br', // confirme o endereço de homologação com a BRy
     'profile' => 'TIMESTAMP', // PAdES com carimbo do tempo; use 'ADRT' com policy_oid se a BRy indicar
     'policy_oid' => '',
-    // 'psc_lifetime' => 28800, // validade da conexão com BirdID, VIDaaS etc., em segundos (180 a 604800)
+    // 'psc_lifetime' => 43200, // validade padrão da conexão com BirdID, VIDaaS etc., em segundos; o médico escolhe no modal
     // 'stamp' => ['coordenadaX' => 10, 'coordenadaY' => 5, 'largura' => 80, 'altura' => 22],
 ];

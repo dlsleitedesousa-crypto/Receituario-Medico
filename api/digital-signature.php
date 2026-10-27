@@ -10,6 +10,7 @@ final class SignatureFailure extends RuntimeException {
 
 const SIGNATURE_TYPES = ['simples' => 'Receita', 'especial' => 'Receita de controle especial', 'atestado' => 'Atestado', 'laudo' => 'Laudo', 'exame' => 'Solicitação de exames', 'fisioterapia' => 'Solicitação de fisioterapia'];
 const SIGNATURE_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const PSC_LIFETIMES = [3600, 14400, 28800, 43200, 86400, 604800];
 
 function signatureSchema(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS signed_documents (
@@ -51,7 +52,7 @@ function signatureConfig(): array {
         'token_url' => $production ? 'https://cloud.bry.com.br/token-service/jwt' : 'https://cloud-hom.bry.com.br/token-service/jwt',
         'hub_url' => $production ? 'https://hub2.bry.com.br' : 'https://hub2.hom.bry.com.br',
         'integra_url' => $production ? 'https://integra.bry.com.br/api/service' : 'https://integra.hom.bry.com.br/api/service',
-        'psc_lifetime' => 28800,
+        'psc_lifetime' => 43200,
         'profile' => 'TIMESTAMP',
         'policy_oid' => '',
         'site_url' => 'https://receita.drdanielleite.com.br',
@@ -164,21 +165,18 @@ function pscDecrypt(array $config, string $stored): ?string {
     return $plain === false ? null : $plain;
 }
 
-// PSCs em que o CPF tem certificado; sem resultado, mostra todos os disponíveis.
-function pscList(array $config, callable $http, string $cpf): array {
+// PSCs disponíveis no Integra BRy; com CPF, apenas os que têm certificado desse titular. Cache de uma hora.
+function pscList(array $config, callable $http, string $cpf = ''): array {
     $cache = signatureStorage($config) . '/.psc-list-' . substr(hash('sha256', $cpf), 0, 16) . '.json';
     $cached = is_file($cache) ? json_decode((string)file_get_contents($cache), true) : null;
     if (is_array($cached) && (int)($cached['expires_at'] ?? 0) > time()) return $cached['names'];
+    $response = $http(rtrim($config['integra_url'], '/') . '/psc/list' . ($cpf !== '' ? '?cpf=' . $cpf : ''), ['Authorization: Bearer ' . bryAccessToken($config, $http)], null);
+    if ($response['status'] !== 200) throw new SignatureFailure('Não foi possível listar os certificados em nuvem.');
     $names = [];
-    foreach ($cpf !== '' ? ['?cpf=' . $cpf, ''] : [''] as $query) {
-        $response = $http(rtrim($config['integra_url'], '/') . '/psc/list' . $query, ['Authorization: Bearer ' . bryAccessToken($config, $http)], null);
-        $result = $response['status'] === 200 ? json_decode($response['body'], true) : null;
-        foreach (is_array($result) ? $result : [] as $item) {
-            if (is_string($item['name'] ?? null) && preg_match('/^[\w .-]{1,40}$/u', $item['name'])) $names[] = $item['name'];
-        }
-        if ($names) break;
+    foreach (json_decode($response['body'], true) ?: [] as $item) {
+        if (is_string($item['name'] ?? null) && preg_match('/^[\w .-]{1,40}$/u', $item['name'])) $names[] = $item['name'];
     }
-    if ($names) file_put_contents($cache, json_encode(['names' => $names, 'expires_at' => time() + 3600]), LOCK_EX);
+    file_put_contents($cache, json_encode(['names' => $names, 'expires_at' => time() + 3600]), LOCK_EX);
     return $names;
 }
 
@@ -228,10 +226,13 @@ function handleDigitalSignature(PDO $pdo, int $userId, string $action, array $da
     signatureSchema($pdo);
     try {
         if ($action === 'signature.status') {
-            try { $pscs = pscList($config, $http, doctorCpf($pdo, $userId)['cpf']); }
+            $cpf = doctorCpf($pdo, $userId)['cpf'];
+            try { $pscs = pscList($config, $http); }
             catch (SignatureFailure $e) { $pscs = []; }
+            try { $withCertificate = $cpf !== '' && $pscs ? pscList($config, $http, $cpf) : []; }
+            catch (SignatureFailure $e) { $withCertificate = []; }
             $session = pscSession($pdo, $userId);
-            respond(['ok' => true, 'enabled' => true, 'pscs' => $pscs, 'psc_session' => $session ? [
+            respond(['ok' => true, 'enabled' => true, 'cpf' => $cpf, 'pscs' => $pscs, 'pscs_with_certificate' => array_values(array_intersect($withCertificate, $pscs)), 'psc_session' => $session ? [
                 'psc' => $session['psc'], 'status' => $session['status'], 'expires_at' => str_replace(' ', 'T', $session['expires_at']) . 'Z',
             ] : null]);
         }
@@ -239,9 +240,10 @@ function handleDigitalSignature(PDO $pdo, int $userId, string $action, array $da
             $psc = (string)($data['psc'] ?? '');
             $cpf = doctorCpf($pdo, $userId)['cpf'];
             if ($cpf === '') respond(['ok' => false, 'error' => 'Cadastre seu CPF em Meu perfil antes de conectar o certificado.'], 422);
-            if (!in_array($psc, pscList($config, $http, ''), true)) respond(['ok' => false, 'error' => 'Provedor de certificado indisponível.'], 422);
+            if (!in_array($psc, pscList($config, $http), true)) respond(['ok' => false, 'error' => 'Provedor de certificado indisponível.'], 422);
             $state = bin2hex(random_bytes(24));
-            $lifetime = max(180, min(604800, (int)$config['psc_lifetime']));
+            // Tempo de atividade escolhido no modal; o PSC pode reduzi-lo.
+            $lifetime = in_array((int)($data['lifetime'] ?? 0), PSC_LIFETIMES, true) ? (int)$data['lifetime'] : max(180, min(604800, (int)$config['psc_lifetime']));
             $response = $http(rtrim($config['integra_url'], '/') . '/psc/link', ['Authorization: Bearer ' . bryAccessToken($config, $http), 'Content-Type: application/json'], json_encode([
                 'pscName' => $psc, 'redirectUri' => rtrim($config['site_url'], '/') . '/psc/retorno', 'state' => $state,
                 'numberOfDocuments' => 1, 'scope' => 'signature_session', 'lifetime' => $lifetime, 'cpf' => $cpf,
