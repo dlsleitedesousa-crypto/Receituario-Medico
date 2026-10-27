@@ -1,13 +1,17 @@
 <?php
 declare(strict_types=1);
 
-session_set_cookie_params([
-    'httponly' => true,
-    'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-    'samesite' => 'Strict',
-    'path' => '/',
-]);
-session_start();
+// Retorno do PSC e validação do QR Code chegam de outros sites, sem o cookie SameSite=Strict:
+// iniciar a sessão nessas rotas criaria um cookie novo e desconectaria o médico.
+if (!in_array($_GET['action'] ?? '', ['validar', 'psc-retorno'], true)) {
+    session_set_cookie_params([
+        'httponly' => true,
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'samesite' => 'Strict',
+        'path' => '/',
+    ]);
+    session_start();
+}
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 

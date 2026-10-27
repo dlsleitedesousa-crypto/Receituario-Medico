@@ -28,6 +28,7 @@
       ...(data instanceof FormData ? { body: data } : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
     });
     const result = await response.json().catch(() => ({}));
+    if (response.status === 401) throw Object.assign(new Error('Sua sessão no Flow Receita expirou. Saia e entre novamente para assinar.'), { result });
     if (!response.ok || !result.ok) throw Object.assign(new Error(result.error || 'Não foi possível concluir a assinatura digital.'), { result });
     return result;
   };
@@ -60,25 +61,26 @@
     return `<span class="ds-logo${large ? ' ds-logo-large' : ''}" style="--ds-color:${item.color}" aria-hidden="true">${safe(large ? item.title : item.title.slice(0, 2))}</span>`;
   };
 
-  // Desenha o QR em vetor, antes da assinatura: qualquer alteração depois dela invalidaria o PAdES.
+  // Desenha o QR em vetor no rodapé de todas as folhas, antes da assinatura: qualquer alteração depois dela invalidaria o PAdES.
   function drawValidationFooter(pdf, { url, code }) {
-    pdf.setPage(pdf.getNumberOfPages());
     const qr = window.qrcode(0, 'M');
     qr.addData(url); qr.make();
-    const count = qr.getModuleCount(), cell = QR_SIZE / count;
-    pdf.setFillColor(0, 0, 0);
-    for (let row = 0; row < count; row++) for (let col = 0; col < count; col++) {
-      if (qr.isDark(row, col)) pdf.rect(QR_X + col * cell, QR_Y + row * cell, cell, cell, 'F');
+    const count = qr.getModuleCount(), cell = QR_SIZE / count, left = QR_X + QR_SIZE + 4;
+    for (let page = 1; page <= pdf.getNumberOfPages(); page++) {
+      pdf.setPage(page);
+      pdf.setFillColor(0, 0, 0);
+      for (let row = 0; row < count; row++) for (let col = 0; col < count; col++) {
+        if (qr.isDark(row, col)) pdf.rect(QR_X + col * cell, QR_Y + row * cell, cell, cell, 'F');
+      }
+      pdf.setTextColor(23, 32, 51);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.5);
+      pdf.text('Documento assinado digitalmente com certificado ICP-Brasil.', left, QR_Y + 5);
+      pdf.text('Confira em validar.iti.gov.br ou leia o QR Code.', left, QR_Y + 9.5);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`Código de validação: ${code}`, left, QR_Y + 14.5);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6);
+      pdf.text(url, left, QR_Y + 19);
     }
-    const left = QR_X + QR_SIZE + 4;
-    pdf.setTextColor(23, 32, 51);
-    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.5);
-    pdf.text('Documento assinado digitalmente com certificado ICP-Brasil.', left, QR_Y + 5);
-    pdf.text('Confira em validar.iti.gov.br ou leia o QR Code.', left, QR_Y + 9.5);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`Código de validação: ${code}`, left, QR_Y + 14.5);
-    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6);
-    pdf.text(url, left, QR_Y + 19);
   }
 
   // Aguarda o médico autenticar na aba do provedor; false se recusou, expirou ou a espera foi cancelada.

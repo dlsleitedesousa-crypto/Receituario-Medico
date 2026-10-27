@@ -34,17 +34,19 @@ async function setup({ type = 'laudo', enabled = true, statuses = [], signReply 
   requests.length = 0;
   return { context, preview, confirm, requests, elements, api: context.digitalSignature };
 }
-test('QR Code e código de validação ficam na faixa do rodapé da última página', async () => {
-  const t = await setup(), calls = { rects: [], texts: [], page: null };
-  const pdf = { getNumberOfPages: () => 2, setPage(page) { calls.page = page; }, setFillColor() {}, setTextColor() {}, setFont() {}, setFontSize() {},
-    rect(x, y, w, h, style) { calls.rects.push({ x, y, w, h, style }); }, text(value, x, y) { calls.texts.push({ value, x, y }); } };
+test('QR Code e código de validação ficam na faixa do rodapé de todas as folhas', async () => {
+  const t = await setup(), calls = { rects: [], texts: [], pages: [] };
+  const pdf = { getNumberOfPages: () => 3, setPage(page) { calls.pages.push(page); }, setFillColor() {}, setTextColor() {}, setFont() {}, setFontSize() {},
+    rect(x, y, w, h, style) { calls.rects.push({ page: calls.pages.at(-1), x, y, w, h, style }); }, text(value, x, y) { calls.texts.push({ page: calls.pages.at(-1), value, x, y }); } };
   t.api.drawValidationFooter(pdf, { url: 'https://receita.drdanielleite.com.br/v/' + 'b'.repeat(32), code: 'WXYZ-2345' });
-  assert.equal(calls.page, 2);
-  assert.ok(calls.rects.length > 100);
+  assert.deepEqual(calls.pages, [1, 2, 3]);
+  for (const page of [1, 2, 3]) {
+    const rects = calls.rects.filter(rect => rect.page === page);
+    assert.ok(rects.length > 100 && rects.length === calls.rects.length / 3, 'QR completo na folha ' + page);
+    assert.ok(calls.texts.some(item => item.page === page && item.value === 'Código de validação: WXYZ-2345'), 'código na folha ' + page);
+  }
   for (const rect of calls.rects) assert.ok(rect.style === 'F' && rect.x >= 12 && rect.x + rect.w <= 34.001 && rect.y >= 270 && rect.y + rect.h <= 292.001);
-  const text = calls.texts.map(item => item.value).join('\n');
-  assert.match(text, /Código de validação: WXYZ-2345/);
-  assert.match(text, /validar\.iti\.gov\.br/);
+  assert.match(calls.texts.map(item => item.value).join('\n'), /validar\.iti\.gov\.br/);
   assert.ok(calls.texts.every(item => item.y > 270 && item.y < 297 && item.x > 34));
 });
 test('assinatura com o certificado em nuvem envia o PDF com rodapé, sem PIN', async () => {
