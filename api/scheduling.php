@@ -37,6 +37,7 @@ function handleScheduling(PDO $pdo, int $userId, string $action, array $data): n
         $stmt->execute([$userId, $date]);
         $items = [];
         foreach ($stmt->fetchAll() as $row) {
+            if (!secretaryCanUsePlace((int)$row['place_id'])) continue;
             $details = json_decode($row['details'], true) ?: [];
             $items[] = array_merge($details, ['id'=>$row['id'],'patient_id'=>$row['patient_id'],'place_id'=>$row['place_id'],'place_name'=>$row['place_name'],'name'=>$row['patient_name'],'cpf'=>$row['cpf'],'birth_date'=>$row['birth_date'],'phone'=>$row['phone'],'date'=>$row['visit_date'],'start'=>substr($row['start_time'],0,5),'end'=>substr($row['end_time'],0,5),'status'=>$row['status']]);
         }
@@ -47,6 +48,7 @@ function handleScheduling(PDO $pdo, int $userId, string $action, array $data): n
     catch (InvalidArgumentException $error) { respond(['ok'=>false,'error'=>$error->getMessage()],422); }
     $id = (int)($data['id'] ?? 0);
     $placeId = (int)($data['place_id'] ?? 0);
+    if (!secretaryCanUsePlace($placeId)) respond(['ok'=>false,'error'=>'Você não tem permissão para agendar neste local.'],403);
     $pdo->beginTransaction();
     // Serialize writes for this professional, including concurrent secretary sessions.
     $stmt = $pdo->prepare('SELECT id FROM users WHERE id=? FOR UPDATE');
@@ -55,9 +57,10 @@ function handleScheduling(PDO $pdo, int $userId, string $action, array $data): n
     $stmt->execute([$placeId,$userId]);
     if (!$stmt->fetch()) { $pdo->rollBack(); respond(['ok'=>false,'error'=>'Selecione um local válido.'],422); }
     if ($id) {
-        $stmt = $pdo->prepare('SELECT id FROM scheduled_visits WHERE id=? AND user_id=?');
+        $stmt = $pdo->prepare('SELECT id,place_id FROM scheduled_visits WHERE id=? AND user_id=?');
         $stmt->execute([$id,$userId]);
-        if (!$stmt->fetch()) { $pdo->rollBack(); respond(['ok'=>false,'error'=>'Agendamento não encontrado.'],404); }
+        $existingVisit=$stmt->fetch();
+        if (!$existingVisit || !secretaryCanUsePlace((int)$existingVisit['place_id'])) { $pdo->rollBack(); respond(['ok'=>false,'error'=>'Agendamento não encontrado.'],404); }
     }
     if (!in_array($value['status'], ['Cancelado','Faltou'], true)) {
         $stmt = $pdo->prepare("SELECT id FROM scheduled_visits WHERE user_id=? AND visit_date=? AND id<>? AND status NOT IN ('Cancelado','Faltou') AND start_time<? AND end_time>? LIMIT 1");

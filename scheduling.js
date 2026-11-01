@@ -17,20 +17,6 @@
     }
     originalShow(id);
   };
-  const secretaryButton=document.createElement('button');secretaryButton.type='button';secretaryButton.className='btn outline';secretaryButton.textContent='Acessos da secretaria';
-  q('scheduleNew').before(secretaryButton);
-  const accessDialog=document.createElement('dialog');accessDialog.id='secretaryAccessDialog';
-  accessDialog.innerHTML='<form id="secretaryAccessForm"><h2>Acessos da secretaria</h2><p>Crie um login restrito à agenda e ao cadastro de pacientes. Para redefinir a senha ou reativar um acesso, use o mesmo e-mail.</p><label class="field"><span>Nome</span><input name="name" maxlength="180" required></label><label class="field"><span>E-mail</span><input name="email" type="email" maxlength="190" required autocomplete="off"></label><label class="field"><span>Senha inicial / nova senha</span><input name="password" type="password" minlength="8" maxlength="72" required autocomplete="new-password"></label><p id="secretaryAccessError" role="alert"></p><div id="secretaryAccessList"></div><div class="schedule-form-actions"><button type="button" class="btn outline" id="secretaryAccessClose">Fechar</button><button class="btn blue" type="submit">Salvar acesso</button></div></form>';
-  screen.append(accessDialog);
-  const accessForm=q('secretaryAccessForm');
-  async function loadAccess() {
-    const result=await request('secretaries.list');q('secretaryAccessList').replaceChildren();
-    result.items.forEach(person=>{const row=document.createElement('p');const label=document.createElement('span');label.textContent=`${person.name} · ${person.email} · ${Number(person.secretary_enabled)?'Ativo':'Desativado'} `;row.append(label);
-      if(Number(person.secretary_enabled))row.append(button('Desativar',async()=>{try{await request('secretaries.disable',{id:person.id});await loadAccess();}catch(e){q('secretaryAccessError').textContent=e.message;}}));q('secretaryAccessList').append(row);});
-  }
-  secretaryButton.onclick=async()=>{if(local){toast('O cadastro de acessos está disponível no site com PHP/MySQL.');return;}accessForm.reset();q('secretaryAccessError').textContent='';accessDialog.showModal();try{await loadAccess();}catch(e){q('secretaryAccessError').textContent=e.message;}};
-  q('secretaryAccessClose').onclick=()=>accessDialog.close();
-  accessForm.onsubmit=async event=>{event.preventDefault();const submit=accessForm.querySelector('[type=submit]');submit.disabled=true;try{await request('secretaries.save',Object.fromEntries(new FormData(accessForm)));accessForm.reset();await loadAccess();toast('Acesso da secretaria salvo.');}catch(e){q('secretaryAccessError').textContent=e.message;}finally{submit.disabled=false;}};
   const fields = [
     ['name','Nome completo','text',180,true],['cpf','CPF','text',11,true],['birth_date','Data de nascimento','date',null,true],['phone','Telefone celular','tel',30,false],
     ['date','Data do atendimento','date',null,true],['start','Hora inicial','time',null,true],['end','Hora final','time',null,true],['procedure','Procedimento','text',180,true],['attendance_type','Tipo de atendimento','select',null,true],['place_id','Local','select',null,true],['status','Status','select',null,true],['insurance','Convênio / particular','text',120,false],['notes','Observações do agendamento','textarea',4000,false]
@@ -60,7 +46,7 @@
     q('scheduleAgenda').setAttribute('aria-current',mode==='agenda'?'page':'false'); q('scheduleConsultations').setAttribute('aria-current',mode==='consultas'?'page':'false');
     q('scheduleProfessional').textContent='Profissional: '+(doctor.name||document.querySelector('#userEmail').textContent);
     if(isSecretary())q('scheduleProfessional').textContent='Secretaria · Agenda do profissional responsável';
-    secretaryButton.hidden=isSecretary();q('scheduleBack').textContent=isSecretary()?'Sair':'← Início';
+    q('scheduleBack').textContent=isSecretary()?'Sair':'← Início';
     const rows=visible(); q('scheduleFeedback').textContent=`${rows.length} atendimento(s) em ${q('scheduleDate').value.split('-').reverse().join('/')}.`+(local?' Prévia local: dados temporários, apagados ao recarregar.':'');
     if(mode==='agenda') {
       const grid=document.createElement('div');grid.className='schedule-grid';

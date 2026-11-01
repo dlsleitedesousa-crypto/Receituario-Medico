@@ -103,7 +103,7 @@ try {
     foreach (['phone' => "VARCHAR(30) NOT NULL DEFAULT ''", 'specialistTitle' => "VARCHAR(180) NOT NULL DEFAULT ''", 'signature' => 'MEDIUMTEXT NULL'] as $column => $definition) {
         if (!$pdo->query("SHOW COLUMNS FROM users LIKE '$column'")->fetch()) $pdo->exec("ALTER TABLE users ADD COLUMN $column $definition");
     }
-    foreach (['secretary_owner_id'=>'BIGINT UNSIGNED NULL', 'secretary_enabled'=>'TINYINT NOT NULL DEFAULT 1'] as $column=>$definition) {
+    foreach (['secretary_owner_id'=>'BIGINT UNSIGNED NULL', 'secretary_enabled'=>'TINYINT NOT NULL DEFAULT 1', 'secretary_place_ids'=>'TEXT NULL'] as $column=>$definition) {
         if (!$pdo->query("SHOW COLUMNS FROM users LIKE '$column'")->fetch()) $pdo->exec("ALTER TABLE users ADD COLUMN $column $definition");
     }
     $schemaTable = 'places';
@@ -290,7 +290,7 @@ try {
     if ($action === 'places.list') {
         $stmt = $pdo->prepare('SELECT id,name,cnes,cnpj,address,phone,logo FROM places WHERE user_id=? ORDER BY name');
         $stmt->execute([$userId]);
-        respond(['ok' => true, 'items' => $stmt->fetchAll()]);
+        respond(['ok' => true, 'items' => array_values(array_filter($stmt->fetchAll(), fn($place) => secretaryCanUsePlace((int)$place['id'])))]);
     }
     if ($action === 'places.save') {
         $id = (int)($data['id'] ?? 0);
