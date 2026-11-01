@@ -17,6 +17,7 @@ function validDoctorCpf(value) {
   $(selector).addEventListener('input', event => { event.target.value = formatDoctorCpf(event.target.value); });
 });
 function applyUserProfile(user) {
+  globalThis.currentSessionUser = { secretary_owner_id: user.secretary_owner_id || null };
   doctor = { title: user.title || '', name: user.name || '', cpf: doctorCpfDigits(user.cpf), specialty: user.specialty || '', crm: user.crm || '', rqe: user.rqe || '', email: user.email || '', phone: user.phone || '', specialistTitle: user.specialistTitle || '', signature: user.signature || '' };
   updateSignatureToggle(true);
   $('#userEmail').textContent = user.name || user.email;

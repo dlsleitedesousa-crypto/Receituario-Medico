@@ -1,5 +1,17 @@
 # Flow Receita — Receituário Médico
 
+## Agendamentos, consultas e secretaria
+
+As abas **Agendamentos** e **Consultas** ficam no início e na navegação do receituário. A agenda diária mostra horários de 10 em 10 minutos, permite mudar a data, filtrar local e buscar paciente por nome ou CPF. O cadastro pede nome, CPF, nascimento, telefone opcional, local, data, início/fim, procedimento, tipo de atendimento, convênio opcional, status e observações. É possível selecionar um paciente existente; salvar atualiza os dados cadastrais correspondentes ao CPF ou cria o paciente. Horários sobrepostos do mesmo profissional são recusados, inclusive quando gravados simultaneamente por sessões diferentes. Cancelados e faltas liberam o horário; finalizados continuam ocupando seu intervalo.
+
+Em **Consultas**, o profissional pode editar o agendamento ou usar **Atender** para preencher os dados do paciente no receituário. O status passa a **Em atendimento**; a finalização é feita editando o status. A gravação de documentos e história clínica continua no fluxo habitual do receituário. Um cronômetro em andamento deve ser salvo e encerrado antes de abrir outro paciente.
+
+Na agenda do profissional, **Acessos da secretaria** permite criar logins com nome, e-mail e senha, redefinir senha/reativar pelo mesmo e-mail e desativar acessos. A secretaria entra pela mesma tela de login e vê somente a agenda e a lista de consultas. Pode cadastrar/atualizar pacientes ao agendar. A API restringe cada secretaria aos pacientes, locais e agenda do profissional responsável e bloqueia documentos, histórico clínico, assinatura digital, perfil médico e gestão de acessos. Desativar um acesso bloqueia também requisições de sessões já abertas. Compartilhe as credenciais diretamente com a pessoa autorizada; o sistema não envia convite por e-mail.
+
+Publique `scheduling.js`, `scheduling.css`, `api/scheduling.php`, `api/secretaries.php` e as alterações de `index.html`, `profile.js`, `patients.js` e `api/index.php`. A API acrescenta `secretary_owner_id` e `secretary_enabled` à tabela `users` e cria `scheduled_visits` no primeiro acesso à agenda. Cadastros, agendamentos e senhas ficam no MySQL; não são versionados. A prévia local mantém agendamentos apenas em memória e não cria logins de secretaria.
+
+Verificação: `node --test tests/*.mjs`. Os testes da agenda cobrem conflito de horários, envio autenticado, redirecionamento de secretaria, falha de gravação e validação de intervalo. A sintaxe PHP foi verificada com parser; migrações, concorrência e permissões precisam também de validação em PHP/MySQL. A implementação atual oferece visualização diária e não inclui repetição automática, bloqueios de agenda, lista de espera, faturamento nem assinatura em lote.
+
 Arquivos recuperados de https://receita.drdanielleite.com.br/ e da conexão autorizada com a Hostinger em 16/09/2026.
 
 ## Arquivos recuperados

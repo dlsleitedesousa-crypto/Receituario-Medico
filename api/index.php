@@ -103,6 +103,9 @@ try {
     foreach (['phone' => "VARCHAR(30) NOT NULL DEFAULT ''", 'specialistTitle' => "VARCHAR(180) NOT NULL DEFAULT ''", 'signature' => 'MEDIUMTEXT NULL'] as $column => $definition) {
         if (!$pdo->query("SHOW COLUMNS FROM users LIKE '$column'")->fetch()) $pdo->exec("ALTER TABLE users ADD COLUMN $column $definition");
     }
+    foreach (['secretary_owner_id'=>'BIGINT UNSIGNED NULL', 'secretary_enabled'=>'TINYINT NOT NULL DEFAULT 1'] as $column=>$definition) {
+        if (!$pdo->query("SHOW COLUMNS FROM users LIKE '$column'")->fetch()) $pdo->exec("ALTER TABLE users ADD COLUMN $column $definition");
+    }
     $schemaTable = 'places';
     $pdo->exec("CREATE TABLE IF NOT EXISTS places (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -183,7 +186,7 @@ try {
     if ($action === 'status') {
         $user = null;
         if (!empty($_SESSION['user_id'])) {
-            $stmt = $pdo->prepare('SELECT id,title,name,cpf,specialty,crm,rqe,email,phone,specialistTitle,signature FROM users WHERE id=? LIMIT 1');
+            $stmt = $pdo->prepare('SELECT id,title,name,cpf,specialty,crm,rqe,email,phone,specialistTitle,signature,secretary_owner_id,secretary_enabled FROM users WHERE id=? AND secretary_enabled=1 LIMIT 1');
             $stmt->execute([(int)$_SESSION['user_id']]);
             $user = $stmt->fetch() ?: null;
         }
@@ -212,7 +215,7 @@ try {
         $stmt = $pdo->prepare('SELECT * FROM users WHERE email=? LIMIT 1');
         $stmt->execute([$email]);
         $user = $stmt->fetch();
-        if (!$user || !password_verify((string)($data['password'] ?? ''), $user['password_hash'])) {
+        if (!$user || !$user['secretary_enabled'] || !password_verify((string)($data['password'] ?? ''), $user['password_hash'])) {
             respond(['ok' => false, 'error' => 'E-mail ou senha inválidos.'], 401);
         }
         session_regenerate_id(true);
@@ -243,6 +246,14 @@ try {
     }
 
     $userId = requireUser();
+    require_once __DIR__ . '/secretaries.php';
+    $userId = authorizeSchedulingUser($pdo, $userId, $action);
+    if (str_starts_with($action, 'secretaries.')) handleSecretaries($pdo, $userId, $action, $data);
+
+    if (str_starts_with($action, 'schedule.')) {
+        require_once __DIR__ . '/scheduling.php';
+        handleScheduling($pdo, $userId, $action, $data);
+    }
 
     if (str_starts_with($action, 'signature.')) {
         require_once __DIR__ . '/digital-signature.php';

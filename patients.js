@@ -379,6 +379,7 @@
     if (document.activeElement === patientNameInput) renderSuggestions();
   };
   search.addEventListener('input', render);
+  document.addEventListener('schedule:saved', () => { patientsLoaded = false; load().catch(notifyError); });
   registrationForm.onsubmit = async event => {
     event.preventDefault();
     const data = registrationData();
