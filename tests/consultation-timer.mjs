@@ -47,3 +47,13 @@ test('histórico mostra início no fuso local e duração sem contar como docume
  const content=root.children[0].children[1].children[0].children[2].textContent;
  assert.ok(content.includes('12:00:00'));assert.ok(content.includes('00:01:05'));
 });
+
+test('finalizar salva antes de encerrar o cronômetro e preserva os textos',async()=>{
+ const nodes=new Map();const $=id=>{if(!nodes.has(id))nodes.set(id,{disabled:false,value:'Texto preservado',textContent:'Receita',dataset:{type:'simples'}});return nodes.get(id);};
+ let resets=0,fail=false;const saved=[];
+ const c=vm.createContext({document:{querySelector:$},window:{consultationTimer:{reset(){resets++;}}},saveAppointmentRecord:async data=>{if(fail)throw Error('Sem conexão');saved.push(data);return {historyReady:true};},toast(){},notifyError(){}});
+ vm.runInContext(patientSource.slice(patientSource.indexOf('  const persistCurrentAppointment'),patientSource.indexOf("  document.addEventListener('patients:load'")),c);
+ await $('#finishAppointment').onclick();assert.equal(resets,1);assert.equal(saved[0].text,'Texto preservado');assert.equal($('#rxText').value,'Texto preservado');
+ fail=true;await $('#finishAppointment').onclick();assert.equal(resets,1);assert.equal($('#finishAppointment').disabled,false);assert.equal($('#saveAppointment').disabled,false);
+ fail=false;await $('#saveAppointment').onclick();assert.equal(resets,1);
+});

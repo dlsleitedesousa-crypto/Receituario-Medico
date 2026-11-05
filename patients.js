@@ -440,9 +440,11 @@
     }
   };
   window.saveAppointmentRecord = saveAppointmentRecord;
-  document.querySelector('#saveAppointment').onclick = async () => {
+  const persistCurrentAppointment = async (finish = false) => {
     const button = document.querySelector('#saveAppointment');
-    button.disabled = true;
+    const finishButton = document.querySelector('#finishAppointment');
+    if (button.disabled || finishButton.disabled) return;
+    button.disabled = true; finishButton.disabled = true;
     try {
       const saved = await saveAppointmentRecord({
         type: document.querySelector('.type-card.active')?.dataset.type,
@@ -451,10 +453,15 @@
         text: document.querySelector('#rxText').value.trim(),
         date: document.querySelector('#rxDate').value
       });
-      if (saved?.historyReady) toast('Atendimento salvo no histórico do paciente.');
+      if (saved && finish) {
+        window.consultationTimer?.reset();
+        toast(saved.historyReady ? 'Atendimento finalizado e salvo no histórico do paciente.' : 'Atendimento finalizado. Reabra o cadastro para consultar o histórico.');
+      } else if (saved?.historyReady) toast('Atendimento salvo no histórico do paciente.');
     } catch (error) { notifyError(error); }
-    finally { button.disabled = false; }
+    finally { button.disabled = false; finishButton.disabled = false; }
   };
+  document.querySelector('#saveAppointment').onclick = () => persistCurrentAppointment();
+  document.querySelector('#finishAppointment').onclick = () => persistCurrentAppointment(true);
   document.addEventListener('patients:load', () => { clearClinicalHistory(); recentAppointments.clear(); patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();
