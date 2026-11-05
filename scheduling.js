@@ -43,6 +43,7 @@
   inputs.price.min='0';inputs.price.max='99999999.99';inputs.price.step='0.01';
   let catalog=[];
   let activeVisit=null;
+  const drafts=new Map();
   const gridProcedure=document.createElement('select');gridProcedure.id='scheduleProcedureFilter';
   const gridLabel=document.createElement('label');gridLabel.className='field';
   const gridCaption=document.createElement('span');gridCaption.textContent='Procedimento / duração dos horários';
@@ -99,7 +100,7 @@
     } else {
       const wrap=document.createElement('div');wrap.className='schedule-table-wrap';const table=document.createElement('table');table.className='schedule-table';
       const thead=document.createElement('thead'),head=document.createElement('tr');thead.append(head);table.append(thead);['Ações','Paciente','Horário','Procedimento / tipo','Local','Status','Convênio'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.append(th);});
-      const tbody=document.createElement('tbody');table.append(tbody);rows.forEach(i=>{const row=document.createElement('tr'),actions=document.createElement('td');tbody.append(row);row.append(actions);actions.append(button('Editar',()=>edit(i)));if(!isSecretary()&&!['Cancelado','Faltou','Finalizado'].includes(i.status))actions.append(button('Atender',()=>attend(i)));[i.name,`${i.start}–${i.end}`,`${i.procedure} / ${i.attendance_type}`,i.place_name,i.status,i.insurance||'Particular'].forEach(t=>{const cell=document.createElement('td');cell.textContent=t;row.append(cell);});});
+      const tbody=document.createElement('tbody');table.append(tbody);rows.forEach(i=>{const row=document.createElement('tr'),actions=document.createElement('td');tbody.append(row);row.append(actions);if(isSecretary())actions.append(button('Editar agendamento',()=>edit(i)));else{const back=button('Voltar para a consulta',()=>attend(i,true));back.disabled=i.date!==today()||!['Em atendimento','Finalizado'].includes(i.status);back.title=i.date!==today()?'Dispon?vel somente no mesmo dia da consulta':'Reabrir os dados salvos para edi??o';actions.append(back);}if(!isSecretary()&&!['Cancelado','Faltou','Finalizado'].includes(i.status))actions.append(button('Atender',()=>attend(i)));[i.name,`${i.start}–${i.end}`,`${i.procedure} / ${i.attendance_type}`,i.place_name,i.status,i.insurance||'Particular'].forEach(t=>{const cell=document.createElement('td');cell.textContent=t;row.append(cell);});});
       if(!rows.length){const row=document.createElement('tr'),cell=document.createElement('td');row.append(cell);tbody.append(row);cell.colSpan=7;cell.textContent='Nenhuma consulta encontrada para os filtros selecionados.';} wrap.append(table);body.append(wrap);
     }
   }
@@ -149,29 +150,53 @@
     try {await save(value);q('scheduleDialog').close();await load();document.dispatchEvent(new Event('schedule:saved'));toast('Agendamento salvo.');}
     catch(e){q('scheduleFormError').textContent=e.message;}finally{q('scheduleSave').disabled=false;}
   };
-  async function attend(item) {
+  async function attend(item,returning=false) {
+    if(returning&&item.date!==today()){toast('Só é possível voltar para editar a consulta no mesmo dia do atendimento.');return;}
     const key=Object.keys(places).find(k=>String(places[k].id||k)===String(item.place_id));
     if(!key){toast('Local indisponível. Atualize a agenda.');return;}
     if(window.consultationTimer?.snapshot()){toast('Salve e encerre o atendimento atual antes de abrir outra consulta.');return;}
     if((document.querySelector('#rxText').value.trim()||document.querySelector('#clinicalHistory').value.trim())&&!confirm('Abrir esta consulta e limpar os textos do atendimento anterior?'))return;
-    try {await save({...item,status:'Em atendimento'});clearPatient();document.querySelector('#rxText').value='';
+    try {
+      const restored=returning?(local?drafts.get(item.id)||{}:await request('schedule.return',{id:item.id})):null;
+      if(!returning)await save({...item,status:'Em atendimento'});
+      clearPatient();document.querySelector('#rxText').value='';
       for(const [id,name] of [['patientName','name'],['patientDoc','cpf'],['patientBirthDate','birth_date']]){const input=document.querySelector('#'+id);input.value=item[name];input.dispatchEvent(new Event('input',{bubbles:true}));}
-      document.querySelector('#rxDate').value=item.date;updatePaperPatient();openRx(key);activeVisit={...item,status:'Em atendimento'};
+      document.querySelector('#rxDate').value=item.date;updatePaperPatient();openRx(key);
+      if(restored){
+        const doc=restored.document;
+        if(doc){
+          const type=/^[a-z_]+$/.test(doc.document_type)?doc.document_type:'simples';
+          document.querySelector('.type-card[data-type="'+type+'"]')?.click?.();
+          document.querySelector('#paperTitle').textContent=doc.document_title;
+          if(type==='personalizado')document.querySelector('#documentTitle').value=doc.document_title;
+          document.querySelector('#rxText').value=doc.document_text;
+        }
+        document.querySelector('#clinicalHistory').value=restored.clinical_history||'';
+      }
+      activeVisit={...item,status:returning?item.status:'Em atendimento',returning};
     }catch(e){toast(e.message);}
   }
+  window.validateScheduledVisitEdit=async()=>{
+    if(!activeVisit?.returning)return;
+    if(activeVisit.date!==today())throw Error('O prazo para editar esta consulta terminou. A edição é permitida somente no mesmo dia.');
+    if(!local)await request('schedule.return',{id:activeVisit.id});
+  };
   window.finishScheduledVisit=async()=>{
     if(!activeVisit)return;
     const cpf=digits(document.querySelector('#patientDoc').value);
     if(cpf!==digits(activeVisit.cpf)||String(selectedPlace.id)!==String(activeVisit.place_id))throw Error('Confira o paciente e o local do agendamento antes de finalizar.');
-    if(local){memory=memory.map(i=>i.id===activeVisit.id?{...i,status:'Finalizado'}:i);}
+    if(local){
+      drafts.set(activeVisit.id,{document:{document_type:document.querySelector('.type-card.active')?.dataset.type||'simples',document_title:document.querySelector('#paperTitle').textContent,document_text:document.querySelector('#rxText').value},clinical_history:document.querySelector('#clinicalHistory').value});
+      memory=memory.map(i=>i.id===activeVisit.id?{...i,status:'Finalizado'}:i);
+    }
     else await request('schedule.finish',{id:activeVisit.id,cpf,place_id:activeVisit.place_id});
     activeVisit=null;q('scheduleFinished').checked=true;await load();
   };
   const originalClearPatient=clearPatient;
   clearPatient=()=>{originalClearPatient();activeVisit=null;};
   ['patientName','patientDoc','patientBirthDate'].forEach(id=>document.querySelector('#'+id).addEventListener('input',()=>{activeVisit=null;}));
-  document.addEventListener('patients:load',()=>{activeVisit=null;catalog=[];});
-  ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{activeVisit=null;catalog=[];}));
+  document.addEventListener('patients:load',()=>{activeVisit=null;catalog=[];drafts.clear();});
+  ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{activeVisit=null;catalog=[];drafts.clear();}));
   function open(target) {mode=target;refreshPlaces();show('#schedulingScreen');return load();}
   for(const host of [document.querySelector('#placesScreen .home-tabs'),document.querySelector('#patientsScreen .top'),document.querySelector('.rx-nav')]) {
     if(!host)continue;host.append(button('Agendamentos',()=>open('agenda')),button('Consultas',()=>open('consultas')));

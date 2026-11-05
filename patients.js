@@ -409,6 +409,7 @@
   };
   const recentAppointments = new Map();
   const saveAppointmentRecord = async ({ type, title, text, date, timerOnly = false }) => {
+    await window.validateScheduledVisitEdit?.();
     if (!validPatient()) return null;
     const clinicalHistory = timerOnly ? '' : clinicalHistoryInput.value.trim();
     const timing = window.consultationTimer?.snapshot() || null;

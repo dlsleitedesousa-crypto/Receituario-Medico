@@ -36,6 +36,19 @@ function handleScheduling(PDO $pdo, int $userId, string $action, array $data): n
         details TEXT NOT NULL,
         INDEX idx_schedule_user_date (user_id, visit_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    if ($action === 'schedule.return') {
+        $stmt=$pdo->prepare('SELECT * FROM scheduled_visits WHERE id=? AND user_id=?');
+        $stmt->execute([(int)($data['id']??0),$userId]);$visit=$stmt->fetch();
+        if (!$visit) respond(['ok'=>false,'error'=>'Consulta não encontrada.'],404);
+        $today=(new DateTimeImmutable('now',new DateTimeZone('America/Fortaleza')))->format('Y-m-d');
+        if ($visit['visit_date']!==$today) respond(['ok'=>false,'error'=>'Só é possível voltar para editar a consulta no mesmo dia do atendimento.'],403);
+        if (!in_array($visit['status'],['Em atendimento','Finalizado'],true)) respond(['ok'=>false,'error'=>'Esta consulta ainda não foi atendida ou foi cancelada.'],409);
+        $stmt=$pdo->prepare("SELECT document_type,document_title,document_text FROM appointments WHERE user_id=? AND patient_id=? AND place_id=? AND document_date=? AND document_type NOT IN ('tempo_atendimento','historia_clinica') ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$userId,$visit['patient_id'],$visit['place_id'],$today]);$document=$stmt->fetch()?:null;
+        $stmt=$pdo->prepare("SELECT document_text FROM appointments WHERE user_id=? AND patient_id=? AND document_date=? AND document_type='historia_clinica' ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$userId,$visit['patient_id'],$today]);$clinical=$stmt->fetchColumn();
+        respond(['ok'=>true,'document'=>$document,'clinical_history'=>$clinical?:'']);
+    }
     if ($action === 'schedule.finish') {
         $stmt = $pdo->prepare('SELECT s.id,s.place_id,s.status,p.cpf FROM scheduled_visits s JOIN patients p ON p.id=s.patient_id AND p.user_id=s.user_id WHERE s.id=? AND s.user_id=?');
         $stmt->execute([(int)($data['id'] ?? 0),$userId]);

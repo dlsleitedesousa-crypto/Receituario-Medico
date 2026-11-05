@@ -31,6 +31,34 @@ function setup(production=false, secretary=false) {
 const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',place_id:'1',status:'Agendado',insurance:'',notes:'<script>texto de teste</script>'};
 const fill=(s,values={})=>Object.entries({...data,...values}).forEach(([key,value])=>s.inputs[key].value=value);
 
+test('voltar para consulta do dia restaura documento e história sem reabrir status',async()=>{
+  const s=setup(true),calls=[];let denied=false;
+  const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  s.context.fetch=async(url,options)=>{
+    const action=new URL(url,'https://example.test').searchParams.get('action');calls.push(action);
+    if(action==='schedule.return')return {ok:!denied,json:async()=>denied?{ok:false,error:'Prazo encerrado'}:{ok:true,document:{document_type:'simples',document_title:'Receita salva',document_text:'Prescrição anterior'},clinical_history:'História anterior'}};
+    return {ok:true,json:async()=>({ok:true,items:[{...data,id:8,date,status:'Finalizado'}]})};
+  };
+  s.nodes.get('#scheduleFinished').checked=true;
+  await s.nodes.get('.rx-nav').children[1].onclick();
+  const actions=s.nodes.get('#scheduleBody').children[0].children[0].children[1].children[0].children[0];
+  assert.equal(actions.children[0].textContent,'Voltar para a consulta');assert.equal(actions.children[0].disabled,false);
+  await actions.children[0].onclick();
+  assert.equal(s.nodes.get('#rxText').value,'Prescrição anterior');assert.equal(s.nodes.get('#clinicalHistory').value,'História anterior');
+  assert.equal(calls.includes('schedule.save'),false);
+  await s.context.window.validateScheduledVisitEdit();denied=true;
+  await assert.rejects(s.context.window.validateScheduledVisitEdit(),/Prazo encerrado/);
+});
+
+test('consulta de outro dia bloqueia retorno inclusive chamada direta do botão',async()=>{
+  const s=setup(true),calls=[];
+  s.context.fetch=async(url)=>{calls.push(url);return {ok:true,json:async()=>({ok:true,items:[{...data,id:8,date:'2001-01-01',status:'Finalizado'}]})};};
+  s.nodes.get('#scheduleFinished').checked=true;await s.nodes.get('.rx-nav').children[1].onclick();
+  const back=s.nodes.get('#scheduleBody').children[0].children[0].children[1].children[0].children[0].children[0];
+  assert.equal(back.disabled,true);const before=calls.length;await back.onclick();assert.equal(calls.length,before);
+  assert.equal(s.nodes.get('#rxText'),undefined);
+});
+
 test('grade usa 20 ou 30 minutos do procedimento e mantém agendamentos fora da grade',async()=>{
   const s=setup(true);
   s.context.window.procedureCatalog.load=async()=>[{id:1,name:'Consulta',duration:20,place_id:1},{id:2,name:'Retorno',duration:30,place_id:1}];
