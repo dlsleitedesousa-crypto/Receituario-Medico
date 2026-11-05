@@ -454,6 +454,7 @@
         date: document.querySelector('#rxDate').value
       });
       if (saved && finish) {
+        await window.finishScheduledVisit?.();
         window.consultationTimer?.reset();
         toast(saved.historyReady ? 'Atendimento finalizado e salvo no histórico do paciente.' : 'Atendimento finalizado. Reabra o cadastro para consultar o histórico.');
       } else if (saved?.historyReady) toast('Atendimento salvo no histórico do paciente.');

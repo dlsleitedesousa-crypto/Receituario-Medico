@@ -36,6 +36,19 @@ function handleScheduling(PDO $pdo, int $userId, string $action, array $data): n
         details TEXT NOT NULL,
         INDEX idx_schedule_user_date (user_id, visit_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    if ($action === 'schedule.finish') {
+        $stmt = $pdo->prepare('SELECT s.id,s.place_id,s.status,p.cpf FROM scheduled_visits s JOIN patients p ON p.id=s.patient_id AND p.user_id=s.user_id WHERE s.id=? AND s.user_id=?');
+        $stmt->execute([(int)($data['id'] ?? 0),$userId]);
+        $visit = $stmt->fetch();
+        if (!$visit || !secretaryCanUsePlace((int)$visit['place_id'])) respond(['ok'=>false,'error'=>'Agendamento não encontrado.'],404);
+        if ($visit['cpf'] !== preg_replace('/\D/', '', (string)($data['cpf'] ?? '')) || (int)$visit['place_id'] !== (int)($data['place_id'] ?? 0)) respond(['ok'=>false,'error'=>'O paciente ou local não corresponde ao agendamento aberto.'],422);
+        $stmt = $pdo->prepare("UPDATE scheduled_visits SET status='Finalizado' WHERE id=? AND user_id=? AND status IN ('Em atendimento','Finalizado')");
+        $stmt->execute([$visit['id'],$userId]);
+        $stmt=$pdo->prepare('SELECT status FROM scheduled_visits WHERE id=? AND user_id=?');
+        $stmt->execute([$visit['id'],$userId]);
+        if ($stmt->fetchColumn() !== 'Finalizado') respond(['ok'=>false,'error'=>'O agendamento não está em atendimento. Confira o status em Consultas.'],409);
+        respond(['ok'=>true]);
+    }
     if ($action === 'schedule.list') {
         $date = (string)($data['date'] ?? '');
         $stmt = $pdo->prepare('SELECT s.*,p.name AS patient_name,p.cpf,p.birth_date,p.phone,l.name AS place_name FROM scheduled_visits s JOIN patients p ON p.id=s.patient_id AND p.user_id=s.user_id JOIN places l ON l.id=s.place_id AND l.user_id=s.user_id WHERE s.user_id=? AND s.visit_date=? ORDER BY s.start_time,s.id');

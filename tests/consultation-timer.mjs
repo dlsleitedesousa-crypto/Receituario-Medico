@@ -56,4 +56,7 @@ test('finalizar salva antes de encerrar o cronômetro e preserva os textos',asyn
  await $('#finishAppointment').onclick();assert.equal(resets,1);assert.equal(saved[0].text,'Texto preservado');assert.equal($('#rxText').value,'Texto preservado');
  fail=true;await $('#finishAppointment').onclick();assert.equal(resets,1);assert.equal($('#finishAppointment').disabled,false);assert.equal($('#saveAppointment').disabled,false);
  fail=false;await $('#saveAppointment').onclick();assert.equal(resets,1);
+ let finishes=0;c.window.finishScheduledVisit=async()=>{finishes++;throw Error('Falha ao atualizar a agenda');};
+ await $('#finishAppointment').onclick();assert.equal(finishes,1);assert.equal(resets,1);assert.equal($('#finishAppointment').disabled,false);
+ c.window.finishScheduledVisit=async()=>{finishes++;};await $('#finishAppointment').onclick();assert.equal(resets,2);assert.equal(finishes,2);
 });

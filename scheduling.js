@@ -42,6 +42,23 @@
   inputs.phone.placeholder='(00) 00000-0000';inputs.phone.pattern='\\([0-9]{2}\\) [0-9]{4,5}-[0-9]{4}';
   inputs.price.min='0';inputs.price.max='99999999.99';inputs.price.step='0.01';
   let catalog=[];
+  let activeVisit=null;
+  const gridProcedure=document.createElement('select');gridProcedure.id='scheduleProcedureFilter';
+  const gridLabel=document.createElement('label');gridLabel.className='field';
+  const gridCaption=document.createElement('span');gridCaption.textContent='Procedimento / duração dos horários';
+  gridLabel.append(gridCaption,gridProcedure);q('scheduleDate').parentNode?.parentNode.append(gridLabel);
+  const gridSelection=()=>catalog.find(p=>String(p.id)===gridProcedure.value);
+  function refreshGridProcedures() {
+    const previous=gridProcedure.value;
+    gridProcedure.replaceChildren(option('','Selecione o procedimento'));
+    const available=catalog.filter(p=>!q('schedulePlaceFilter').value||String(p.place_id)===q('schedulePlaceFilter').value);
+    available.forEach(p=>{
+      const place=Object.entries(places).find(([key,l])=>String(l.id||key)===String(p.place_id))?.[1];
+      gridProcedure.append(option(String(p.id),`${p.name} · ${p.duration} min · ${place?.name||'Local removido'}`));
+    });
+    gridProcedure.value=available.some(p=>String(p.id)===previous)?previous:String(available[0]?.id||'');
+  }
+  gridProcedure.onchange=render;
   const selectedProcedure=()=>catalog.find(p=>String(p.id)===inputs.procedure.selectedOptions[0]?.dataset.id);
   function updateEnd() {
     const p=selectedProcedure();if(!p||!inputs.start.value)return;
@@ -68,7 +85,10 @@
     const rows=visible(); q('scheduleFeedback').textContent=`${rows.length} atendimento(s) em ${q('scheduleDate').value.split('-').reverse().join('/')}.`+(local?' Prévia local: dados temporários, apagados ao recarregar.':'');
     if(mode==='agenda') {
       const grid=document.createElement('div');grid.className='schedule-grid';
-      const times=new Set(Array.from({length:67},(_,i)=>{const m=420+i*10;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}));
+      const duration=Number(gridSelection()?.duration)||30;
+      const times=new Set();
+      for(let m=420;m<=1080;m+=duration)times.add(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+      q('scheduleFeedback').textContent+=` Horários a cada ${duration} minutos.`;
       rows.forEach(i=>times.add(i.start));
       [...times].sort().forEach(time=>{
         const row=document.createElement('div');row.className='schedule-slot';row.append(button(time,()=>edit(null,time)));
@@ -85,7 +105,7 @@
   }
   async function load() {
     const current=++sequence; q('scheduleBody').replaceChildren();q('scheduleFeedback').textContent='Carregando agenda…';
-    try { const loaded=local?memory.filter(i=>i.date===q('scheduleDate').value):(await request('schedule.list',{date:q('scheduleDate').value})).items; if(current!==sequence)return;items=loaded;render(); }
+    try { const [loaded,procedures]=await Promise.all([local?memory.filter(i=>i.date===q('scheduleDate').value):request('schedule.list',{date:q('scheduleDate').value}).then(result=>result.items),window.procedureCatalog.load()]); if(current!==sequence)return;items=loaded;catalog=procedures;refreshGridProcedures();render(); }
     catch(e){if(current===sequence){items=[];q('scheduleFeedback').textContent=e.message;}}
   }
   function refreshPlaces() {
@@ -109,7 +129,7 @@
       catalog=await window.procedureCatalog.load();
       catalog.forEach(p=>{const place=Object.entries(places).find(([key,l])=>String(l.id||key)===String(p.place_id))?.[1];const el=option(p.name,p.name+' · '+Number(p.price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+' · '+p.duration+' min · '+(place?.name||'Local removido'));el.dataset.id=p.id;inputs.procedure.append(el);});
       if(item){const match=[...inputs.procedure.options].find(o=>o.value===item.procedure&&String(catalog.find(p=>String(p.id)===o.dataset.id)?.place_id)===String(item.place_id));if(match)match.selected=true;else{const old=option(item.procedure,item.procedure+' (agendamento existente)');inputs.procedure.append(old);old.selected=true;}}
-      else {const p=catalog.find(p=>!q('schedulePlaceFilter').value||String(p.place_id)===q('schedulePlaceFilter').value);if(p){[...inputs.procedure.options].find(o=>o.dataset.id===String(p.id)).selected=true;inputs.procedure.onchange();}else q('scheduleFormError').textContent='Cadastre os procedimentos em Meu perfil → Configurações da agenda.';}
+      else {const p=gridSelection()||catalog.find(p=>!q('schedulePlaceFilter').value||String(p.place_id)===q('schedulePlaceFilter').value);if(p){[...inputs.procedure.options].find(o=>o.dataset.id===String(p.id)).selected=true;inputs.procedure.onchange();}else q('scheduleFormError').textContent='Cadastre os procedimentos em Meu perfil → Configurações da agenda.';}
       q('scheduleSave').disabled=false;
     } catch(e){q('scheduleFormError').textContent=e.message;return;}
     try { patients=local?[]:(await request('patients.list')).items;patients.forEach(p=>q('schedulePatient').append(option(p.id,`${p.name} · ${p.cpf}`))); }
@@ -136,10 +156,23 @@
     if((document.querySelector('#rxText').value.trim()||document.querySelector('#clinicalHistory').value.trim())&&!confirm('Abrir esta consulta e limpar os textos do atendimento anterior?'))return;
     try {await save({...item,status:'Em atendimento'});clearPatient();document.querySelector('#rxText').value='';
       for(const [id,name] of [['patientName','name'],['patientDoc','cpf'],['patientBirthDate','birth_date']]){const input=document.querySelector('#'+id);input.value=item[name];input.dispatchEvent(new Event('input',{bubbles:true}));}
-      document.querySelector('#rxDate').value=item.date;updatePaperPatient();openRx(key);
+      document.querySelector('#rxDate').value=item.date;updatePaperPatient();openRx(key);activeVisit={...item,status:'Em atendimento'};
     }catch(e){toast(e.message);}
   }
-  function open(target) {mode=target;refreshPlaces();show('#schedulingScreen');load();}
+  window.finishScheduledVisit=async()=>{
+    if(!activeVisit)return;
+    const cpf=digits(document.querySelector('#patientDoc').value);
+    if(cpf!==digits(activeVisit.cpf)||String(selectedPlace.id)!==String(activeVisit.place_id))throw Error('Confira o paciente e o local do agendamento antes de finalizar.');
+    if(local){memory=memory.map(i=>i.id===activeVisit.id?{...i,status:'Finalizado'}:i);}
+    else await request('schedule.finish',{id:activeVisit.id,cpf,place_id:activeVisit.place_id});
+    activeVisit=null;q('scheduleFinished').checked=true;await load();
+  };
+  const originalClearPatient=clearPatient;
+  clearPatient=()=>{originalClearPatient();activeVisit=null;};
+  ['patientName','patientDoc','patientBirthDate'].forEach(id=>document.querySelector('#'+id).addEventListener('input',()=>{activeVisit=null;}));
+  document.addEventListener('patients:load',()=>{activeVisit=null;catalog=[];});
+  ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{activeVisit=null;catalog=[];}));
+  function open(target) {mode=target;refreshPlaces();show('#schedulingScreen');return load();}
   for(const host of [document.querySelector('#placesScreen .home-tabs'),document.querySelector('#patientsScreen .top'),document.querySelector('.rx-nav')]) {
     if(!host)continue;host.append(button('Agendamentos',()=>open('agenda')),button('Consultas',()=>open('consultas')));
   }
@@ -149,7 +182,7 @@
   q('scheduleAgenda').onclick=()=>{mode='agenda';render();};q('scheduleConsultations').onclick=()=>{mode='consultas';render();};
   q('scheduleToday').onclick=()=>{q('scheduleDate').value=today();load();};
   for(const [id,delta] of [['schedulePrevious',-1],['scheduleNext',1]])q(id).onclick=()=>{const date=new Date(q('scheduleDate').value+'T12:00:00');date.setDate(date.getDate()+delta);q('scheduleDate').value=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;load();};
-  ['schedulePlaceFilter','scheduleFinished'].forEach(id=>q(id).onchange=render);q('scheduleSearch').oninput=render;
+  q('schedulePlaceFilter').onchange=()=>{refreshGridProcedures();render();};q('scheduleFinished').onchange=render;q('scheduleSearch').oninput=render;
   document.addEventListener('patients:load',()=>{sequence++;items=[];memory=[];patients=[];q('scheduleBody').replaceChildren();q('scheduleForm').reset();if(q('scheduleDialog').open)q('scheduleDialog').close();});
   ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{sequence++;items=[];memory=[];patients=[];q('scheduleBody').replaceChildren();q('scheduleForm').reset();if(q('scheduleDialog').open)q('scheduleDialog').close();}));
 })();

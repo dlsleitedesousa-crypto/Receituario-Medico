@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 
 function setup(production=false, secretary=false) {
-  const nodes=new Map(), listeners={}, requests=[];
+  const nodes=new Map(), listeners={}, requests=[], created=[];
   class Node {
     constructor(tag='div'){this.tagName=tag.toUpperCase();this.value='';this.children=[];this.dataset={};this.textContent='';this.classList={add(){}};}
     append(...nodes){this.children.push(...nodes);if(this.tagName==='SELECT'&&this.children.length===nodes.length)this.value=nodes[0]?.value||'';}
@@ -13,21 +13,54 @@ function setup(production=false, secretary=false) {
     get selectedOptions(){const selected=this.children.filter(n=>n.selected);return selected.length?selected:this.children.filter(n=>n.value===this.value);}
     querySelector(id){if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);}
     before(){} setAttribute(){} addEventListener(event,fn){this[event]=fn;}
+    dispatchEvent(event){this[event.type]?.(event);}
     showModal(){this.open=true;} close(){this.open=false;} reset(){}
     createTHead(){return this;}createTBody(){return this;}
     insertRow(){const n=new Node();this.append(n);return n;}
     insertCell(){const n=new Node();this.append(n);return n;}
   }
-  const document={body:new Node(),createElement:tag=>new Node(tag),querySelector:id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},addEventListener:(e,fn)=>listeners[e]=fn,dispatchEvent(){}};
+  const document={body:new Node(),createElement:tag=>{const node=new Node(tag);created.push(node);return node;},querySelector:id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},addEventListener:(e,fn)=>listeners[e]=fn,dispatchEvent(){}};
   let shown;
   const context=vm.createContext({document,formatDoctorCpf:value=>String(value).replace(/\D/g,'').slice(0,11).replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'),location:{hostname:production?'example.test':'localhost'},Intl,Date,Event,window:{procedureCatalog:{load:async()=>[]},currentSessionUser:{secretary_owner_id:secretary?1:null}},doctor:{name:'Profissional de teste'},places:{one:{id:1,name:'Local de teste'}},show(id){shown=id;},toast(){},patientAge:()=>20,confirm:()=>true,clearPatient(){},updatePaperPatient(){},openRx(){},fetch:async(url,options)=>{requests.push({url,credentials:options.credentials,data:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true,items:[]})};}});
   vm.runInContext(readFileSync(new URL('../scheduling.js',import.meta.url),'utf8'),context);
+  context.selectedPlace={id:1};
   const screen=document.body.children[0], fields=nodes.get('#scheduleFields').children;
   const inputs=Object.fromEntries(fields.map(label=>{const input=label.children[1];return [input.name,input];}));
-  return {nodes,inputs,requests,screen,listeners,context,shown:()=>shown};
+  return {nodes,inputs,requests,screen,listeners,context,created,shown:()=>shown};
 }
 const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',place_id:'1',status:'Agendado',insurance:'',notes:'<script>texto de teste</script>'};
 const fill=(s,values={})=>Object.entries({...data,...values}).forEach(([key,value])=>s.inputs[key].value=value);
+
+test('grade usa 20 ou 30 minutos do procedimento e mantém agendamentos fora da grade',async()=>{
+  const s=setup(true);
+  s.context.window.procedureCatalog.load=async()=>[{id:1,name:'Consulta',duration:20,place_id:1},{id:2,name:'Retorno',duration:30,place_id:1}];
+  s.context.fetch=async()=>({ok:true,json:async()=>({ok:true,items:[{...data,id:9,start:'09:15',end:'09:35'}]})});
+  await s.nodes.get('.rx-nav').children[0].onclick();
+  const times=()=>s.nodes.get('#scheduleBody').children[0].children.map(row=>row.children[0].textContent);
+  assert.deepEqual(times().slice(0,4),['07:00','07:20','07:40','08:00']);assert.ok(times().includes('09:15'));
+  const filter=s.created.find(n=>n.id==='scheduleProcedureFilter');filter.value='2';filter.onchange();
+  assert.deepEqual(times().slice(0,3),['07:00','07:30','08:00']);assert.ok(times().includes('09:15'));
+});
+
+test('finaliza somente a consulta aberta e preserva vínculo após falha para tentar novamente',async()=>{
+  const s=setup(true);const calls=[];let fail=false,status='Agendado';
+  s.context.fetch=async(url,options)=>{
+    const action=new URL(url,'https://example.test').searchParams.get('action'),value=JSON.parse(options.body);calls.push({action,value});
+    if(action==='schedule.finish'&&fail)return {ok:false,json:async()=>({ok:false,error:'Sem conexão'})};
+    if(action==='schedule.save')status=value.status;
+    if(action==='schedule.finish')status='Finalizado';
+    return {ok:true,json:async()=>({ok:true,items:[{...data,id:9,status}]})};
+  };
+  await s.nodes.get('.rx-nav').children[1].onclick();
+  const actions=s.nodes.get('#scheduleBody').children[0].children[0].children[1].children[0].children[0];
+  await actions.children[1].onclick();
+  fail=true;await assert.rejects(s.context.window.finishScheduledVisit(),/Sem conexão/);
+  assert.equal(status,'Em atendimento');
+  fail=false;await s.context.window.finishScheduledVisit();assert.equal(status,'Finalizado');
+  assert.equal(calls.find(c=>c.action==='schedule.finish').value.id,9);
+  assert.equal(s.nodes.get('#scheduleFinished').checked,true);
+  const count=calls.length;await s.context.window.finishScheduledVisit();assert.equal(calls.length,count);
+});
 
 test('máscaras brasileiras aceitam CPF e telefone e enviam somente dígitos',async()=>{
   const s=setup(true);fill(s,{cpf:'12345678901',phone:'85912345678'});
