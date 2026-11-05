@@ -86,8 +86,25 @@ test('finaliza somente a consulta aberta e preserva vínculo após falha para te
   assert.equal(status,'Em atendimento');
   fail=false;await s.context.window.finishScheduledVisit();assert.equal(status,'Finalizado');
   assert.equal(calls.find(c=>c.action==='schedule.finish').value.id,9);
-  assert.equal(s.nodes.get('#scheduleFinished').checked,true);
+  assert.equal(s.nodes.get('#scheduleFinished').checked,false);
   const count=calls.length;await s.context.window.finishScheduledVisit();assert.equal(calls.length,count);
+});
+
+test('finalizados continuam em Agendamentos e saem somente da fila de Consultas',async()=>{
+  const s=setup(true);
+  s.context.fetch=async()=>({ok:true,json:async()=>({ok:true,items:[{...data,id:1,status:'Finalizado'},{...data,id:2,name:'Paciente Aguardando',status:'Agendado'}]})});
+  await s.nodes.get('.rx-nav').children[0].onclick();
+  const grid=s.nodes.get('#scheduleBody').children[0];
+  const cards=grid.children.flatMap(row=>row.children[1].children);
+  assert.equal(cards.length,2);assert.ok(cards.some(card=>card.textContent.includes('Finalizado')));
+  assert.equal(s.nodes.get('#scheduleFinishedFilter').hidden,true);
+  s.nodes.get('#scheduleDate').value='2000-01-01';s.nodes.get('#scheduleSearch').value='busca antiga';s.nodes.get('#schedulePlaceFilter').value='99';
+  await s.nodes.get('#scheduleConsultations').onclick();
+  assert.equal(s.nodes.get('#scheduleSearch').value,'');assert.equal(s.nodes.get('#schedulePlaceFilter').value,'');
+  assert.equal(s.nodes.get('#scheduleDate').value,new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
+  const rows=()=>s.nodes.get('#scheduleBody').children[0].children[0].children[1].children;
+  assert.equal(rows().length,1);assert.equal(rows()[0].children[1].textContent,'Paciente Aguardando');
+  s.nodes.get('#scheduleFinished').checked=true;s.nodes.get('#scheduleFinished').onchange();assert.equal(rows().length,2);
 });
 
 test('máscaras brasileiras aceitam CPF e telefone e enviam somente dígitos',async()=>{
