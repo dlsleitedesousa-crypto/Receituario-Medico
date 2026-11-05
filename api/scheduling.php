@@ -2,11 +2,16 @@
 declare(strict_types=1);
 
 function schedulingValues(array $data): array {
+    foreach (['cpf','phone'] as $key) $data[$key] = preg_replace('/\D/', '', (string)($data[$key] ?? ''));
     $value = [];
     foreach (['name'=>180,'cpf'=>11,'birth_date'=>10,'phone'=>30,'date'=>10,'start'=>5,'end'=>5,'procedure'=>180,'attendance_type'=>80,'insurance'=>120,'notes'=>4000,'status'=>30] as $key=>$limit) {
         $value[$key] = trim((string)($data[$key] ?? ''));
         if (mb_strlen($value[$key]) > $limit) throw new InvalidArgumentException('Campo muito longo: ' . $key);
     }
+    if ($value['phone'] !== '' && !preg_match('/^\d{10,11}$/D', $value['phone'])) throw new InvalidArgumentException('Informe telefone com DDD e 10 ou 11 dígitos.');
+    $price = (string)($data['price'] ?? '0');
+    if (!preg_match('/^\d{1,8}(\.\d{1,2})?$/D', $price)) throw new InvalidArgumentException('Informe um valor válido.');
+    $value['price'] = $price;
     foreach (['birth_date','date'] as $key) {
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value[$key]);
         if (!$date || $date->format('Y-m-d') !== $value[$key]) throw new InvalidArgumentException('Informe datas válidas.');

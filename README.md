@@ -134,6 +134,10 @@ A tabela `signed_documents` guarda apenas o identificador público, o hash do c�
 
 ## Cronômetro do atendimento
 
+Em **Meu perfil → Configurações da agenda**, cadastre procedimentos com valor em reais, duração em minutos e local previamente cadastrado. É possível editar ou excluir cada item; cadastre outra entrada para oferecer o procedimento em outro local. Ao clicar no horário da agenda, o procedimento preenche o valor, o local e o término automaticamente. A secretaria consulta apenas os procedimentos dos locais autorizados. Os dados ficam no MySQL, na tabela `scheduling_procedures`, criada automaticamente pela API; na prévia localhost são temporários. O valor fica preservado em cada agendamento, mesmo após alterar ou excluir o catálogo. CPF e telefone aceitam a formatação brasileira e são enviados como dígitos para a API.
+
+Para publicar esta funcionalidade, inclua `procedure-settings.js`, `scheduling.js`, `index.html`, `api/procedures.php`, `api/index.php`, `api/scheduling.php` e `api/secretaries.php`. Verificação da agenda e permissões: `node --test tests/scheduling.mjs tests/secretary-profile.mjs`.
+
 No topo do receituário, “Iniciar atendimento” inicia a contagem para o paciente preenchido e o local selecionado. O início e a duração são gravados no histórico ao salvar o atendimento, gerar documentos ou limpar os dados do paciente. O botão de limpar grava a duração final antes de zerar; se a gravação falhar, preserva os dados para nova tentativa. Também é possível salvar somente o tempo, sem documento ou história clínica.
 
 O registro “Tempo de atendimento” exibe o início no fuso America/Fortaleza e a duração em horas, minutos e segundos. Salvamentos repetidos atualizam o mesmo cronômetro, sem duplicá-lo. A API cria as colunas `consultation_started_at` e `consultation_duration_seconds` em `appointments`. O cronômetro fica apenas na sessão aberta do navegador; trocar o paciente, sair da conta ou recarregar a página encerra a contagem local. Execute `node --test tests/consultation-timer.mjs` para conferir os fluxos de tempo, salvamento e limpeza.

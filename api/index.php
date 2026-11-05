@@ -250,6 +250,11 @@ try {
     $userId = authorizeSchedulingUser($pdo, $userId, $action);
     if (str_starts_with($action, 'secretaries.')) handleSecretaries($pdo, $userId, $action, $data);
 
+    if (str_starts_with($action, 'procedures.')) {
+        require_once __DIR__ . '/procedures.php';
+        handleProcedures($pdo, $userId, $action, $data);
+    }
+
     if (str_starts_with($action, 'schedule.')) {
         require_once __DIR__ . '/scheduling.php';
         handleScheduling($pdo, $userId, $action, $data);
