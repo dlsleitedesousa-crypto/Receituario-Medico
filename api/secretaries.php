@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 function secretaryAllowedAction(string $action): bool {
-    return in_array($action, ['schedule.list','schedule.save','procedures.list','patients.list','patients.save','patients.update','places.list'], true);
+    return in_array($action, ['schedule.list','schedule.save','agenda-settings.get','procedures.list','patients.list','patients.save','patients.update','places.list'], true);
 }
 
 function secretaryCanUsePlace(int $placeId): bool {

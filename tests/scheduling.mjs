@@ -22,6 +22,7 @@ function setup(production=false, secretary=false) {
   const document={body:new Node(),createElement:tag=>{const node=new Node(tag);created.push(node);return node;},querySelector:id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},addEventListener:(e,fn)=>listeners[e]=fn,dispatchEvent(){}};
   let shown;
   const context=vm.createContext({document,formatDoctorCpf:value=>String(value).replace(/\D/g,'').slice(0,11).replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'),location:{hostname:production?'example.test':'localhost'},Intl,Date,Event,window:{procedureCatalog:{load:async()=>[]},currentSessionUser:{secretary_owner_id:secretary?1:null}},doctor:{name:'Profissional de teste'},places:{one:{id:1,name:'Local de teste'}},show(id){shown=id;},toast(){},patientAge:()=>20,confirm:()=>true,clearPatient(){},updatePaperPatient(){},openRx(){},fetch:async(url,options)=>{requests.push({url,credentials:options.credentials,data:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true,items:[]})};}});
+  vm.runInContext(readFileSync(new URL('../agenda-model.js',import.meta.url),'utf8'),context);
   vm.runInContext(readFileSync(new URL('../scheduling.js',import.meta.url),'utf8'),context);
   context.selectedPlace={id:1};
   const screen=document.body.children[0], fields=nodes.get('#scheduleFields').children;
@@ -113,6 +114,7 @@ test('finaliza somente a consulta aberta e preserva vínculo após falha para te
 
 test('finalizados continuam em Agendamentos e saem somente da fila de Consultas',async()=>{
   const s=setup(true);
+  s.nodes.get('#scheduleDate').value=data.date;
   s.context.fetch=async()=>({ok:true,json:async()=>({ok:true,items:[{...data,id:1,status:'Finalizado'},{...data,id:2,name:'Paciente Aguardando',status:'Agendado'}]})});
   await s.nodes.get('.rx-nav').children[0].onclick();
   const grid=s.nodes.get('#scheduleBody').children[0];

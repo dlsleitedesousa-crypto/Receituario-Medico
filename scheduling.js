@@ -9,6 +9,15 @@
   screen.innerHTML = `<header class="top"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Agenda e consultas</small></div></div><button class="btn outline" id="scheduleBack">← Início</button></header><main class="page"><nav class="home-tabs" aria-label="Agenda e consultas"><button class="home-tab" id="scheduleAgenda">Agendamentos</button><button class="home-tab" id="scheduleConsultations">Consultas</button></nav><div class="schedule-title"><div><span class="eyebrow">Organização dos atendimentos</span><h1 id="scheduleHeading">Agendamentos</h1><p id="scheduleProfessional"></p></div><button class="btn blue" id="scheduleNew">+ Novo agendamento</button></div><div class="schedule-toolbar"><button class="btn outline" id="schedulePrevious" aria-label="Dia anterior">‹</button><button class="btn outline" id="scheduleToday">Hoje</button><button class="btn outline" id="scheduleNext" aria-label="Próximo dia">›</button><label class="field"><span>Data</span><input type="date" id="scheduleDate" required></label><label class="field"><span>Local</span><select id="schedulePlaceFilter"><option value="">Todos os locais</option></select></label><label class="field"><span>Buscar paciente</span><input id="scheduleSearch" type="search" placeholder="Nome ou CPF"></label><label id="scheduleFinishedFilter"><input type="checkbox" id="scheduleFinished"> Mostrar finalizados e cancelados</label></div><p id="scheduleFeedback" role="status" aria-live="polite"></p><div id="scheduleBody"></div><dialog id="scheduleDialog"><form id="scheduleForm"><div class="schedule-title"><h2 id="scheduleFormHeading">Novo agendamento</h2><button class="btn outline" type="button" id="scheduleClose" aria-label="Fechar cadastro">✕</button></div><p>Busque um paciente cadastrado ou preencha os dados para cadastrá-lo junto ao agendamento.</p><div class="schedule-fields"><label class="field wide"><span>Paciente cadastrado</span><select id="schedulePatient"><option value="">Novo paciente / selecionar cadastro</option></select></label></div><div class="schedule-fields" id="scheduleFields"></div><p id="scheduleFormError" role="alert"></p><div class="schedule-form-actions"><button class="btn outline" type="button" id="scheduleCancel">Voltar</button><button class="btn blue" type="submit" id="scheduleSave">Salvar agendamento</button></div></form></dialog></main>`;
   document.body.append(screen);
   const q = id => screen.querySelector('#' + id);
+  const model=window.agendaModel;
+  let settings={...model.defaults},view='day',monthCursor=null;
+  const shell=document.createElement('div');shell.className='agenda-workspace';
+  const panel=document.createElement('section');panel.className='agenda-main';
+  const controls=document.createElement('div');controls.className='agenda-viewbar';
+  controls.innerHTML='<h2 id="agendaDateHeading"></h2><div class="agenda-view-buttons" aria-label="Visualização da agenda"><button type="button" data-view="day">Dia</button><button type="button" data-view="week">Semana</button><button type="button" data-view="month">Mês</button><button type="button" data-view="list">Compromissos</button></div>';
+  const aside=document.createElement('aside');aside.className='agenda-sidebar';
+  aside.innerHTML='<button type="button" class="agenda-sidebar-toggle" id="agendaCollapse">› Recolher painel</button><b id="agendaCount"></b><label class="agenda-toggle"><input type="checkbox" id="agendaOnlyValid"> Somente válidos</label><button class="agenda-side-action" id="agendaSearchFocus" type="button">⌕ Buscar agendamento</button><button class="agenda-side-action" id="agendaWaiting" type="button">◷ Pacientes aguardando <b id="agendaWaitingCount">0</b></button><section class="agenda-mini-calendar"><h3>▦ Calendário</h3><div class="agenda-calendar-nav"><button type="button" id="agendaMonthPrevious" aria-label="Mês anterior">‹</button><b id="agendaMonthHeading"></b><button type="button" id="agendaMonthNext" aria-label="Próximo mês">›</button></div><div id="agendaCalendarDays"></div></section><div class="agenda-legend"><span>Agendado</span><span>Confirmado</span><span>Em atendimento</span><span>Finalizado</span></div><button class="agenda-side-action" id="agendaConfigure" type="button">⚙ Configurações da agenda</button><button class="agenda-side-action" id="agendaProcedures" type="button">◇ Procedimentos e valores</button><button class="agenda-side-action" id="agendaPrint" type="button">▤ Imprimir agenda</button><button class="agenda-side-action" id="agendaExport" type="button">↓ Exportar agenda</button>';
+  q('scheduleBody').before(shell);panel.append(controls,q('scheduleBody'));shell.append(panel,aside);
   const isSecretary = () => !!window.currentSessionUser?.secretary_owner_id;
   const originalShow = show;
   show = id => {
@@ -18,8 +27,7 @@
     originalShow(id);
   };
   const fields = [
-    ['name','Nome completo','text',180,true],['cpf','CPF','text',14,true],['birth_date','Data de nascimento','date',null,true],['phone','Telefone celular','tel',15,false],
-    ['date','Data do atendimento','date',null,true],['start','Hora inicial','time',null,true],['end','Hora final','time',null,true],['procedure','Procedimento','select',null,true],['price','Valor (R$)','number',null,true],['attendance_type','Tipo de atendimento','select',null,true],['place_id','Local','select',null,true],['status','Status','select',null,true],['insurance','Convênio / particular','text',120,false],['notes','Observações do agendamento','textarea',4000,false]
+    ['name','Paciente / nome completo','text',180,true],['place_id','Local','select',null,true],['date','Data do atendimento','date',null,true],['start','Hora inicial','time',null,true],['end','Hora final','time',null,true],['status','Status','select',null,true],['procedure','Procedimento','select',null,true],['attendance_type','Tipo de atendimento','select',null,true],['insurance','Convênio / particular','text',120,false],['price','Valor (R$)','number',null,true],['cpf','CPF','text',14,true],['birth_date','Data de nascimento','date',null,true],['sex','Sexo biológico','select',null,false],['phone','Telefone celular','tel',15,false],['email','E-mail','email',190,false],['city','Cidade','text',180,false],['notes','Observações do agendamento','textarea',4000,false]
   ];
   const inputs = {};
   const option = (value, label=value) => { const el=document.createElement('option'); el.value=value; el.textContent=label; return el; };
@@ -48,6 +56,9 @@
   const gridLabel=document.createElement('label');gridLabel.className='field';
   const gridCaption=document.createElement('span');gridCaption.textContent='Procedimento / duração dos horários';
   gridLabel.append(gridCaption,gridProcedure);q('scheduleDate').parentNode?.parentNode.append(gridLabel);
+  const professionalLabel=document.createElement('label');professionalLabel.className='field';
+  const professionalCaption=document.createElement('span');professionalCaption.textContent='Profissional';
+  const professionalInput=document.createElement('input');professionalInput.readOnly=true;professionalInput.setAttribute('aria-label','Profissional responsável');professionalLabel.append(professionalCaption,professionalInput);q('scheduleDate').parentNode?.parentNode.append(professionalLabel);
   const gridSelection=()=>catalog.find(p=>String(p.id)===gridProcedure.value);
   function refreshGridProcedures() {
     const previous=gridProcedure.value;
@@ -68,13 +79,22 @@
   }
   inputs.procedure.onchange=()=>{const p=selectedProcedure();if(p){inputs.price.value=Number(p.price).toFixed(2);inputs.place_id.value=String(p.place_id);updateEnd();}};
   inputs.start.onchange=updateEnd;
+  ['Não informado','Feminino','Masculino','Intersexo'].forEach(value=>inputs.sex.append(option(value)));
+  const patientSearch=document.createElement('input');patientSearch.type='search';patientSearch.placeholder='Buscar paciente por nome ou CPF';patientSearch.setAttribute('aria-label','Buscar paciente cadastrado');
+  q('schedulePatient').before(patientSearch);
+  patientSearch.oninput=()=>{
+    const search=patientSearch.value.trim().toLocaleLowerCase('pt-BR');
+    q('schedulePatient').replaceChildren(option('','Novo paciente / selecionar cadastro'));
+    patients.filter(p=>(p.name+' '+p.cpf).toLocaleLowerCase('pt-BR').includes(search)).forEach(p=>q('schedulePatient').append(option(p.id,`${p.name} · ${p.cpf}`)));
+  };
   statuses.forEach(s=>inputs.status.append(option(s)));
   ['Consulta','Retorno','Exame','Procedimento','Teleconsulta','Outro'].forEach(s=>inputs.attendance_type.append(option(s)));
   const request = async (action,data={}) => {
     const response=await fetch('api/index.php?action='+encodeURIComponent(action),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const result=await response.json(); if(!response.ok||!result.ok) throw new Error(result.error||'Não foi possível carregar a agenda.'); return result;
   };
-  const visible = () => items.filter(i=>(!q('schedulePlaceFilter').value||String(i.place_id)===q('schedulePlaceFilter').value)&&(mode==='agenda'||!['Finalizado','Cancelado','Faltou'].includes(i.status)||q('scheduleFinished').checked)&&(i.name+' '+i.cpf).toLocaleLowerCase('pt-BR').includes(q('scheduleSearch').value.trim().toLocaleLowerCase('pt-BR')));
+  let onlyWaiting=false;
+  const visible = () => items.filter(i=>(!q('schedulePlaceFilter').value||String(i.place_id)===q('schedulePlaceFilter').value)&&(mode==='agenda'||!['Finalizado','Cancelado','Faltou'].includes(i.status)||q('scheduleFinished').checked)&&(!q('agendaOnlyValid').checked||!['Cancelado','Faltou'].includes(i.status))&&(!onlyWaiting||i.status==='Aguardando')&&(i.name+' '+i.cpf).toLocaleLowerCase('pt-BR').includes(q('scheduleSearch').value.trim().toLocaleLowerCase('pt-BR')));
   const button = (label, action) => { const el=document.createElement('button');el.type='button';el.className='btn outline';el.textContent=label;el.onclick=action;return el; };
   const actualStart = item => item.actual_started_at ? new Date(item.actual_started_at).toLocaleTimeString('pt-BR',{timeZone:'America/Fortaleza',hour:'2-digit',minute:'2-digit',second:'2-digit'}) : 'Não registrado';
   const actualDuration = item => {
@@ -83,27 +103,82 @@
     const text=[Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,'0')).join(':');
     return !item.actual_ended_at&&item.status==='Em atendimento'?text+' (em andamento)':text;
   };
+  function eventCard(item) {
+    const card=button(`${item.start}–${item.end} · ${item.name} · ${item.procedure} · ${Number(item.price||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · ${item.attendance_type} · ${item.status}`,()=>edit(item));
+    card.classList.add('schedule-event');card.dataset.status=item.status;return card;
+  }
+  function renderCalendar() {
+    const selected=q('scheduleDate').value,cursor=monthCursor||selected;
+    q('agendaMonthHeading').textContent=new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(model.date(cursor));
+    const days=q('agendaCalendarDays');days.replaceChildren();
+    ['D','S','T','Q','Q','S','S'].forEach(day=>{const label=document.createElement('span');label.textContent=day;days.append(label);});
+    model.range(cursor,'month').forEach(date=>{
+      const day=button(String(Number(date.slice(-2))),()=>{q('scheduleDate').value=date;monthCursor=date;return load();});
+      day.className='agenda-calendar-day';day.setAttribute('aria-label',date.split('-').reverse().join('/'));
+      day.setAttribute('aria-current',date===selected?'date':'false');
+      if(date.slice(0,7)!==cursor.slice(0,7))day.classList.add('agenda-outside');
+      days.append(day);
+    });
+  }
   function render() {
     const body=q('scheduleBody');body.replaceChildren();
+    shell.className=mode==='agenda'?'agenda-workspace':'agenda-workspace agenda-consultations';
     q('scheduleHeading').textContent=mode==='agenda'?'Agendamentos':'Consultas';
     q('scheduleAgenda').setAttribute('aria-current',mode==='agenda'?'page':'false'); q('scheduleConsultations').setAttribute('aria-current',mode==='consultas'?'page':'false');
     q('scheduleProfessional').textContent='Profissional: '+(doctor.name||document.querySelector('#userEmail').textContent);
     if(isSecretary())q('scheduleProfessional').textContent='Secretaria · Agenda do profissional responsável';
+    professionalInput.value=isSecretary()?'Profissional responsável':doctor.name||'Profissional';
     q('scheduleBack').textContent=isSecretary()?'Sair':'← Início';
     q('scheduleFinishedFilter').hidden=mode==='agenda';
+    aside.hidden=mode!=='agenda';controls.hidden=mode!=='agenda';gridLabel.hidden=mode!=='agenda';
+    controls.querySelectorAll?.('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===view)));
+    q('agendaDateHeading').textContent=new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}).format(model.date(q('scheduleDate').value));
+    q('agendaConfigure').hidden=q('agendaProcedures').hidden=isSecretary();
+    q('agendaCount').textContent=items.length+' agendamento(s)';q('agendaWaitingCount').textContent=items.filter(i=>i.status==='Aguardando').length;
+    renderCalendar();
     const rows=visible(); q('scheduleFeedback').textContent=`${rows.length} atendimento(s) em ${q('scheduleDate').value.split('-').reverse().join('/')}.`+(local?' Prévia local: dados temporários, apagados ao recarregar.':'');
-    if(mode==='agenda') {
+    if(mode==='agenda'&&view==='month') {
+      const month=document.createElement('div');month.className='agenda-month-grid';
+      ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(day=>{const heading=document.createElement('b');heading.textContent=day;month.append(heading);});
+      model.range(q('scheduleDate').value,'month').forEach(date=>{
+        const cell=document.createElement('div');cell.className='agenda-month-day'+(date.slice(0,7)!==q('scheduleDate').value.slice(0,7)?' agenda-outside':'');
+        cell.append(button(String(Number(date.slice(-2))),()=>{q('scheduleDate').value=date;view='day';return load();}));
+        rows.filter(i=>i.date===date).forEach(item=>cell.append(eventCard(item)));month.append(cell);
+      });body.append(month);
+    } else if(mode==='agenda'&&view==='list') {
+      const list=document.createElement('div');list.className='agenda-commitments';
+      rows.forEach(item=>list.append(eventCard(item)));
+      if(!rows.length)list.textContent='Nenhum compromisso para esta data.';body.append(list);
+    } else if(mode==='agenda') {
       const grid=document.createElement('div');grid.className='schedule-grid';
-      const duration=Number(gridSelection()?.duration)||30;
-      const times=new Set();
-      for(let m=420;m<=1080;m+=duration)times.add(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+      grid.style?.setProperty('--agenda-row-height',settings.row_height+'px');
+      const duration=model.interval(settings,gridSelection());
+      const times=new Set(model.slots(settings,gridSelection()));
       q('scheduleFeedback').textContent+=` Horários a cada ${duration} minutos.`;
       rows.forEach(i=>times.add(i.start));
+      const dates=model.range(q('scheduleDate').value,view);
+      if(view==='week'){
+        grid.classList.add('agenda-week-grid');grid.style?.setProperty('--agenda-days',dates.length);
+        const head=document.createElement('div');head.className='agenda-week-heading';head.append(document.createElement('span'));
+        dates.forEach(date=>{const label=document.createElement('b');label.textContent=new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'}).format(model.date(date));head.append(label);});grid.append(head);
+      }
       [...times].sort().forEach(time=>{
-        const row=document.createElement('div');row.className='schedule-slot';row.append(button(time,()=>edit(null,time)));
-        const content=document.createElement('div');content.className='schedule-slot-content';
-        rows.filter(i=>i.start===time).forEach(i=>{const card=button(`${i.start}–${i.end} · ${i.name} · ${i.procedure} · ${Number(i.price||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · ${i.attendance_type} · ${i.status}`,()=>edit(i));card.classList.add('schedule-event');content.append(card);});
-        row.append(content);grid.append(row);
+        const row=document.createElement('div');row.className='schedule-slot';
+        const timeButton=button(time,()=>edit(null,time));
+        timeButton.disabled=!model.available(settings,time,model.time(Math.min(1439,model.minutes(time)+Number(gridSelection()?.duration||settings.default_duration))));row.append(timeButton);
+        dates.forEach(date=>{
+          const content=document.createElement('div');content.className='schedule-slot-content';
+          const end=model.time(Math.min(1439,model.minutes(time)+Number(gridSelection()?.duration||settings.default_duration)));
+          const available=model.available(settings,time,end);
+          if(!available)content.classList.add('agenda-unavailable');
+          const create=()=>{if(available)return edit(null,time,date);};
+          content.onclick=event=>{if(event.target===content)create();};
+          content.setAttribute('role','button');content.setAttribute('tabindex',available?'0':'-1');content.setAttribute('aria-label',(available?'Agendar ':'Indisponível ')+date+' às '+time);
+          content.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();create();}};
+          rows.filter(i=>i.start===time&&i.date===date).forEach(i=>content.append(eventCard(i)));
+          if(!available&&!content.children.length){const label=document.createElement('small');label.textContent=settings.lunch_enabled&&time>=settings.lunch_start&&time<settings.lunch_end?'Almoço':'Indisponível';content.append(label);}
+          row.append(content);
+        });grid.append(row);
       }); body.append(grid);
     } else {
       const wrap=document.createElement('div');wrap.className='schedule-table-wrap';const table=document.createElement('table');table.className='schedule-table';
@@ -114,7 +189,8 @@
   }
   async function load() {
     const current=++sequence; q('scheduleBody').replaceChildren();q('scheduleFeedback').textContent='Carregando agenda…';
-    try { const [loaded,procedures]=await Promise.all([local?memory.filter(i=>i.date===q('scheduleDate').value):request('schedule.list',{date:q('scheduleDate').value}).then(result=>result.items),window.procedureCatalog.load()]); if(current!==sequence)return;items=loaded;catalog=procedures;refreshGridProcedures();render(); }
+    const dates=model.range(q('scheduleDate').value,mode==='agenda'?view:'day');
+    try { const [loaded,procedures,configuration]=await Promise.all([local?memory.filter(i=>i.date>=dates[0]&&i.date<=dates[dates.length-1]):request('schedule.list',{date:dates[0],end_date:dates[dates.length-1]}).then(result=>result.items),window.procedureCatalog.load(),window.agendaSettings?.load()||settings]); if(current!==sequence)return;items=loaded;catalog=procedures;settings=configuration;refreshGridProcedures();render(); }
     catch(e){if(current===sequence){items=[];q('scheduleFeedback').textContent=e.message;}}
   }
   function refreshPlaces() {
@@ -122,11 +198,12 @@
     Object.entries(places).forEach(([key,p])=>{const id=String(p.id||key);inputs.place_id.append(option(id,p.name));q('schedulePlaceFilter').append(option(id,p.name));});q('schedulePlaceFilter').value=previous;
   }
   let editingId=null;
-  async function edit(item=null,time='07:00') {
+  async function edit(item=null,time=settings.opening,date=q('scheduleDate').value) {
     q('scheduleForm').reset();q('scheduleFormError').textContent='';editingId=item?.id||null;
+    patientSearch.value='';
     refreshPlaces();q('scheduleFormHeading').textContent=item?'Editar agendamento':'Novo agendamento';
-    const minutes=Number(time.slice(0,2))*60+Number(time.slice(3))+10;
-    const defaults={date:q('scheduleDate').value,start:time,end:`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`,procedure:'Consulta',attendance_type:'Consulta',status:'Agendado'};
+    const minutes=model.minutes(time)+Number(settings.default_duration);
+    const defaults={date,start:time,end:minutes<1440?model.time(minutes):'',procedure:'Consulta',attendance_type:'Consulta',status:'Agendado'};
     fields.forEach(([name])=>inputs[name].value=String(item?.[name]??defaults[name]??''));
     q('schedulePatient').replaceChildren(option('','Novo paciente / selecionar cadastro'));
     inputs.cpf.value=formatDoctorCpf(inputs.cpf.value);inputs.phone.value=formatPhone(inputs.phone.value);
@@ -147,6 +224,8 @@
   q('schedulePatient').onchange=()=>{const p=patients.find(p=>String(p.id)===q('schedulePatient').value);if(p)for(const name of ['name','cpf','birth_date','phone'])inputs[name].value=name==='cpf'?formatDoctorCpf(p[name]):name==='phone'?formatPhone(p[name]):p[name]||'';};
   async function save(value) {
     if(!local)return request('schedule.save',value);
+    const previous=memory.find(i=>i.id===value.id);
+    if(!['Cancelado','Faltou'].includes(value.status)&&(!previous||previous.start!==value.start||previous.end!==value.end||previous.date!==value.date)&&!model.available(settings,value.start,value.end))throw Error('Escolha um horário dentro do funcionamento e fora do almoço.');
     if(!['Cancelado','Faltou'].includes(value.status)&&memory.some(i=>i.id!==value.id&&i.date===value.date&&!['Cancelado','Faltou'].includes(i.status)&&i.start<value.end&&i.end>value.start))throw new Error('Já existe um atendimento nesse horário.');
     const place=Object.entries(places).find(([key,p])=>String(p.id||key)===String(value.place_id))?.[1];
     const item={...value,id:value.id||Date.now(),place_name:place?.name||''};memory=memory.filter(i=>i.id!==item.id);memory.push(item);return {ok:true,id:item.id};
@@ -211,17 +290,32 @@
   ['patientName','patientDoc','patientBirthDate'].forEach(id=>document.querySelector('#'+id).addEventListener('input',()=>{activeVisit=null;}));
   document.addEventListener('patients:load',()=>{activeVisit=null;catalog=[];drafts.clear();});
   ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{activeVisit=null;catalog=[];drafts.clear();}));
-  function open(target) {mode=target;if(target==='consultas'){q('scheduleDate').value=today();q('scheduleSearch').value='';q('schedulePlaceFilter').value='';}refreshPlaces();show('#schedulingScreen');return load();}
+  function open(target) {mode=target;if(target==='consultas'){onlyWaiting=false;monthCursor=null;q('scheduleDate').value=today();q('scheduleSearch').value='';q('schedulePlaceFilter').value='';}refreshPlaces();show('#schedulingScreen');return load();}
   window.openConsultations=()=>open('consultas');
+  controls.querySelectorAll?.('[data-view]').forEach(button=>button.onclick=()=>{view=button.dataset.view;return load();});
+  q('agendaOnlyValid').onchange=render;
+  q('agendaSearchFocus').onclick=()=>q('scheduleSearch').focus();
+  q('agendaWaiting').onclick=()=>{onlyWaiting=!onlyWaiting;render();};
+  q('agendaConfigure').onclick=()=>window.agendaSettings.open();
+  q('agendaProcedures').onclick=()=>document.querySelector('.open-profile')?.click();
+  q('agendaPrint').onclick=()=>window.print();
+  q('agendaCollapse').onclick=()=>{const collapsed=aside.classList.toggle('agenda-sidebar-collapsed');q('agendaCollapse').textContent=collapsed?'‹ Expandir painel':'› Recolher painel';};
+  for(const [id,step]of [['agendaMonthPrevious',-1],['agendaMonthNext',1]])q(id).onclick=()=>{const date=model.date(monthCursor||q('scheduleDate').value);date.setDate(1);date.setMonth(date.getMonth()+step);monthCursor=model.iso(date);renderCalendar();};
+  q('agendaExport').onclick=()=>{
+    const escape=value=>'"'+String(value??'').replace(/"/g,'""').replace(/^[=+@-]/,"'")+'"';
+    const rows=[['Data','Início','Fim','Paciente','Procedimento','Local','Status','Valor'],...visible().map(i=>[i.date,i.start,i.end,i.name,i.procedure,i.place_name,i.status,i.price])];
+    const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(escape).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='agenda-'+q('scheduleDate').value+'.csv';link.click();URL.revokeObjectURL(url);
+  };
+  document.addEventListener('agenda-settings:saved',()=>{monthCursor=null;load();});
   for(const host of [document.querySelector('#placesScreen .home-tabs'),document.querySelector('#patientsScreen .top'),document.querySelector('.rx-nav')]) {
     if(!host)continue;host.append(button('Agendamentos',()=>open('agenda')),button('Consultas',()=>open('consultas')));
   }
-  q('scheduleDate').value=today();q('scheduleDate').onchange=load;
+  q('scheduleDate').value=today();q('scheduleDate').onchange=()=>{monthCursor=null;return load();};
   q('scheduleBack').onclick=()=>{if(isSecretary())document.querySelector('#logoutButton').click();else show('#placesScreen');};q('scheduleNew').onclick=()=>edit();
   q('scheduleClose').onclick=q('scheduleCancel').onclick=()=>q('scheduleDialog').close();
   q('scheduleAgenda').onclick=()=>open('agenda');q('scheduleConsultations').onclick=()=>open('consultas');
-  q('scheduleToday').onclick=()=>{q('scheduleDate').value=today();load();};
-  for(const [id,delta] of [['schedulePrevious',-1],['scheduleNext',1]])q(id).onclick=()=>{const date=new Date(q('scheduleDate').value+'T12:00:00');date.setDate(date.getDate()+delta);q('scheduleDate').value=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;load();};
+  q('scheduleToday').onclick=()=>{q('scheduleDate').value=today();monthCursor=null;return load();};
+  for(const [id,delta] of [['schedulePrevious',-1],['scheduleNext',1]])q(id).onclick=()=>{const date=model.date(q('scheduleDate').value);if(mode==='agenda'&&view==='month'){date.setDate(1);date.setMonth(date.getMonth()+delta);}else date.setDate(date.getDate()+delta*(mode==='agenda'&&view==='week'?7:1));q('scheduleDate').value=model.iso(date);monthCursor=null;return load();};
   q('schedulePlaceFilter').onchange=()=>{refreshGridProcedures();render();};q('scheduleFinished').onchange=render;q('scheduleSearch').oninput=render;
   document.addEventListener('patients:load',()=>{sequence++;items=[];memory=[];patients=[];q('scheduleBody').replaceChildren();q('scheduleForm').reset();if(q('scheduleDialog').open)q('scheduleDialog').close();});
   ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{sequence++;items=[];memory=[];patients=[];q('scheduleBody').replaceChildren();q('scheduleForm').reset();if(q('scheduleDialog').open)q('scheduleDialog').close();}));
