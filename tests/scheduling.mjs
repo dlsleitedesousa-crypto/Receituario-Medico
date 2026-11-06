@@ -32,6 +32,61 @@ function setup(production=false, secretary=false) {
 const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',place_id:'1',status:'Agendado',insurance:'',notes:'<script>texto de teste</script>'};
 const fill=(s,values={})=>Object.entries({...data,...values}).forEach(([key,value])=>s.inputs[key].value=value);
 
+const detailsDialog=s=>s.created.find(node=>node.id==='scheduleDetailsDialog');
+const eventCard=s=>s.created.find(node=>node.dataset.status);
+
+test('clique no agendamento permite salvar cada status para profissional e secretaria',async()=>{
+  for(const secretary of [false,true]) {
+    const s=setup(true,secretary),saved=[];let item={...data,id:12,place_name:'Local de teste'};
+    s.context.fetch=async(url,options)=>{
+      const action=new URL(url,'https://example.test').searchParams.get('action');
+      if(action==='schedule.save'){item=JSON.parse(options.body);saved.push(item);assert.equal(options.credentials,'same-origin');}
+      return {ok:true,json:async()=>({ok:true,items:[item]})};
+    };
+    s.nodes.get('#scheduleDate').value=data.date;
+    await s.nodes.get('.rx-nav').children[0].onclick();
+    const selector=s.nodes.get('#scheduleStatus');
+    for(const status of ['Confirmado','Aguardando','Em atendimento','Finalizado','Cancelado','Faltou','Agendado']) {
+      s.created.filter(node=>node.dataset.status).at(-1).onclick();
+      assert.equal(detailsDialog(s).open,true);assert.equal(selector.value,item.status);
+      assert.equal(s.nodes.get('#scheduleDetailsPatient').textContent,data.name);
+      selector.value=status;await s.nodes.get('#scheduleStatusForm').onsubmit({preventDefault(){}});
+      assert.equal(detailsDialog(s).open,false);assert.equal(item.status,status);
+      assert.equal(item.id,12);assert.equal(item.date,data.date);assert.equal(item.notes,data.notes);
+      assert.equal(s.created.filter(node=>node.dataset.status).at(-1).dataset.status,status);
+    }
+    assert.equal(saved.length,7);
+  }
+});
+
+test('falha ao alterar status mantém janela e permite tentar novamente sem duplicar envio',async()=>{
+  const s=setup(true);let fail=true,release,saves=0;
+  s.context.fetch=async(url)=>{
+    if(url.includes('schedule.save')){saves++;await new Promise(resolve=>release=resolve);return {ok:!fail,json:async()=>fail?{ok:false,error:'Sem conexão'}:{ok:true}};}
+    return {ok:true,json:async()=>({ok:true,items:[{...data,id:12}]})};
+  };
+  s.nodes.get('#scheduleDate').value=data.date;
+  await s.nodes.get('.rx-nav').children[0].onclick();eventCard(s).onclick();
+  s.nodes.get('#scheduleStatus').value='Confirmado';
+  const submit=()=>s.nodes.get('#scheduleStatusForm').onsubmit({preventDefault(){}});
+  const pending=submit();await submit();s.nodes.get('#scheduleDetailsClose').onclick();
+  assert.equal(saves,1);assert.equal(detailsDialog(s).open,true);assert.equal(s.nodes.get('#scheduleStatusSave').disabled,true);
+  release();await pending;
+  assert.equal(detailsDialog(s).open,true);assert.equal(s.nodes.get('#scheduleStatusError').textContent,'Sem conexão');
+  assert.equal(s.nodes.get('#scheduleStatus').value,'Confirmado');assert.equal(s.nodes.get('#scheduleStatusSave').disabled,false);
+  fail=false;const retry=submit();release();await retry;assert.equal(detailsDialog(s).open,false);
+});
+
+test('resumo permite editar cadastro e fecha sem gravar quando o status não muda',async()=>{
+  const s=setup(true);s.context.fetch=async(url)=>{assert.equal(url.includes('schedule.save'),false);return {ok:true,json:async()=>({ok:true,items:[{...data,id:12}]})};};
+  s.nodes.get('#scheduleDate').value=data.date;
+  await s.nodes.get('.rx-nav').children[0].onclick();eventCard(s).onclick();
+  await s.nodes.get('#scheduleStatusForm').onsubmit({preventDefault(){}});assert.equal(detailsDialog(s).open,false);
+  eventCard(s).onclick();await s.nodes.get('#scheduleDetailsEdit').onclick();
+  assert.equal(detailsDialog(s).open,false);assert.equal(s.nodes.get('#scheduleDialog').open,true);
+  assert.equal(s.inputs.name.value,data.name);assert.equal(s.inputs.status.value,data.status);
+});
+
 test('Consultas separa horário agendado, início real e tempo realizado',async()=>{
   const s=setup(true);
   s.context.fetch=async()=>({ok:true,json:async()=>({ok:true,items:[

@@ -9,6 +9,10 @@
   screen.innerHTML = `<header class="top"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Agenda e consultas</small></div></div><button class="btn outline" id="scheduleBack">← Início</button></header><main class="page"><nav class="home-tabs" aria-label="Agenda e consultas"><button class="home-tab" id="scheduleAgenda">Agendamentos</button><button class="home-tab" id="scheduleConsultations">Consultas</button></nav><div class="schedule-title"><div><span class="eyebrow">Organização dos atendimentos</span><h1 id="scheduleHeading">Agendamentos</h1><p id="scheduleProfessional"></p></div><button class="btn blue" id="scheduleNew">+ Novo agendamento</button></div><div class="schedule-toolbar"><button class="btn outline" id="schedulePrevious" aria-label="Dia anterior">‹</button><button class="btn outline" id="scheduleToday">Hoje</button><button class="btn outline" id="scheduleNext" aria-label="Próximo dia">›</button><label class="field"><span>Data</span><input type="date" id="scheduleDate" required></label><label class="field"><span>Local</span><select id="schedulePlaceFilter"><option value="">Todos os locais</option></select></label><label class="field"><span>Buscar paciente</span><input id="scheduleSearch" type="search" placeholder="Nome ou CPF"></label><label id="scheduleFinishedFilter"><input type="checkbox" id="scheduleFinished"> Mostrar finalizados e cancelados</label></div><p id="scheduleFeedback" role="status" aria-live="polite"></p><div id="scheduleBody"></div><dialog id="scheduleDialog"><form id="scheduleForm"><div class="schedule-title"><h2 id="scheduleFormHeading">Novo agendamento</h2><button class="btn outline" type="button" id="scheduleClose" aria-label="Fechar cadastro">✕</button></div><p>Busque um paciente cadastrado ou preencha os dados para cadastrá-lo junto ao agendamento.</p><div class="schedule-fields"><label class="field wide"><span>Paciente cadastrado</span><select id="schedulePatient"><option value="">Novo paciente / selecionar cadastro</option></select></label></div><div class="schedule-fields" id="scheduleFields"></div><p id="scheduleFormError" role="alert"></p><div class="schedule-form-actions"><button class="btn outline" type="button" id="scheduleCancel">Voltar</button><button class="btn blue" type="submit" id="scheduleSave">Salvar agendamento</button></div></form></dialog></main>`;
   document.body.append(screen);
   const q = id => screen.querySelector('#' + id);
+  const detailsDialog=document.createElement('dialog');detailsDialog.id='scheduleDetailsDialog';
+  detailsDialog.setAttribute('aria-labelledby','scheduleDetailsHeading');
+  detailsDialog.innerHTML='<form id="scheduleStatusForm"><div class="schedule-title"><h2 id="scheduleDetailsHeading">Visualizar agendamento</h2><button type="button" class="btn outline" id="scheduleDetailsClose" aria-label="Fechar agendamento">✕</button></div><h3 id="scheduleDetailsPatient"></h3><p id="scheduleDetailsSummary"></p><label class="field"><span>Alterar status</span><select id="scheduleStatus" required aria-label="Alterar status do agendamento"></select></label><p id="scheduleStatusError" role="alert"></p><div class="schedule-form-actions"><button type="button" class="btn outline" id="scheduleDetailsEdit">Editar agendamento</button><button type="submit" class="btn blue" id="scheduleStatusSave">Salvar status</button></div></form>';
+  screen.append(detailsDialog);
   const model=window.agendaModel;
   let settings={...model.defaults},view='day',monthCursor=null;
   const shell=document.createElement('div');shell.className='agenda-workspace';
@@ -88,6 +92,7 @@
     patients.filter(p=>(p.name+' '+p.cpf).toLocaleLowerCase('pt-BR').includes(search)).forEach(p=>q('schedulePatient').append(option(p.id,`${p.name} · ${p.cpf}`)));
   };
   statuses.forEach(s=>inputs.status.append(option(s)));
+  statuses.forEach(s=>q('scheduleStatus').append(option(s)));
   ['Consulta','Retorno','Exame','Procedimento','Teleconsulta','Outro'].forEach(s=>inputs.attendance_type.append(option(s)));
   const request = async (action,data={}) => {
     const response=await fetch('api/index.php?action='+encodeURIComponent(action),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
@@ -104,7 +109,7 @@
     return !item.actual_ended_at&&item.status==='Em atendimento'?text+' (em andamento)':text;
   };
   function eventCard(item) {
-    const card=button(`${item.start}–${item.end} · ${item.name} · ${item.procedure} · ${Number(item.price||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · ${item.attendance_type} · ${item.status}`,()=>edit(item));
+    const card=button(`${item.start}–${item.end} · ${item.name} · ${item.procedure} · ${Number(item.price||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · ${item.attendance_type} · ${item.status}`,()=>showDetails(item));
     card.classList.add('schedule-event');card.dataset.status=item.status;return card;
   }
   function renderCalendar() {
@@ -198,6 +203,31 @@
     Object.entries(places).forEach(([key,p])=>{const id=String(p.id||key);inputs.place_id.append(option(id,p.name));q('schedulePlaceFilter').append(option(id,p.name));});q('schedulePlaceFilter').value=previous;
   }
   let editingId=null;
+  let detailsItem=null,statusSaving=false;
+  function showDetails(item) {
+    detailsItem=item;q('scheduleDetailsPatient').textContent=item.name;
+    q('scheduleDetailsSummary').textContent=`${item.date.split('-').reverse().join('/')} · ${item.start}–${item.end} · ${item.procedure} · ${item.place_name||'Local não informado'}`;
+    q('scheduleStatus').value=item.status;q('scheduleStatusError').textContent='';
+    detailsDialog.showModal();
+  }
+  function closeDetails() {if(!statusSaving){detailsDialog.close();detailsItem=null;}}
+  q('scheduleDetailsClose').onclick=closeDetails;
+  detailsDialog.addEventListener('cancel',event=>{if(statusSaving)event.preventDefault();});
+  q('scheduleDetailsEdit').onclick=()=>{const item=detailsItem;if(!item||statusSaving)return;closeDetails();return edit(item);};
+  q('scheduleStatusForm').onsubmit=async event=>{
+    event.preventDefault();if(!detailsItem||statusSaving)return;
+    const item=detailsItem,status=q('scheduleStatus').value;
+    if(status===item.status){closeDetails();return;}
+    if(!statuses.includes(status)){q('scheduleStatusError').textContent='Selecione um status válido.';return;}
+    statusSaving=true;q('scheduleStatusError').textContent='';
+    const controls=['scheduleStatus','scheduleStatusSave','scheduleDetailsEdit','scheduleDetailsClose'];
+    controls.forEach(id=>q(id).disabled=true);
+    try {
+      await save({...item,status});detailsDialog.close();detailsItem=null;
+      await load();document.dispatchEvent(new Event('schedule:saved'));toast('Status do agendamento atualizado.');
+    } catch(e){q('scheduleStatusError').textContent=e.message;}
+    finally{statusSaving=false;controls.forEach(id=>q(id).disabled=false);}
+  };
   async function edit(item=null,time=settings.opening,date=q('scheduleDate').value) {
     q('scheduleForm').reset();q('scheduleFormError').textContent='';editingId=item?.id||null;
     patientSearch.value='';
@@ -319,5 +349,5 @@
   for(const [id,delta] of [['schedulePrevious',-1],['scheduleNext',1]])q(id).onclick=()=>{const date=model.date(q('scheduleDate').value);if(mode==='agenda'&&view==='month'){date.setDate(1);date.setMonth(date.getMonth()+delta);}else date.setDate(date.getDate()+delta*(mode==='agenda'&&view==='week'?7:1));q('scheduleDate').value=model.iso(date);monthCursor=null;return load();};
   q('schedulePlaceFilter').onchange=()=>{refreshGridProcedures();render();};q('scheduleFinished').onchange=render;q('scheduleSearch').oninput=render;
   document.addEventListener('patients:load',()=>{sequence++;items=[];memory=[];patients=[];q('scheduleBody').replaceChildren();q('scheduleForm').reset();if(q('scheduleDialog').open)q('scheduleDialog').close();});
-  ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{sequence++;items=[];memory=[];patients=[];q('scheduleBody').replaceChildren();q('scheduleForm').reset();if(q('scheduleDialog').open)q('scheduleDialog').close();}));
+  ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{sequence++;items=[];memory=[];patients=[];detailsItem=null;detailsDialog.close();q('scheduleBody').replaceChildren();q('scheduleForm').reset();if(q('scheduleDialog').open)q('scheduleDialog').close();}));
 })();
