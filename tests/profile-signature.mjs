@@ -42,6 +42,12 @@ test('abrir e cancelar edição preserva assinatura; remoção é enviada no per
   assert.equal(values.signature,''); context.applyUserProfile(values);
   assert.equal($('#useElectronicSignature').disabled,true);
 });
+
+test('voltar no perfil retorna à tela de origem sem salvar alterações',()=>{
+  const {context,$,button}=setup();const screens=[];context.show=id=>screens.push(id);context.applyUserProfile(user);
+  button.onclick();$('#profileName').value='Rascunho';$('#backProfile').onclick();
+  assert.equal(screens.at(-1),'#rxScreen');assert.equal(context.doctor.name,user.name);
+});
 test('perfil antigo e nova sessão deixam a chave desligada',()=>{
   const {context,$}=setup(); context.applyUserProfile(user); $('#useElectronicSignature').checked=true;
   context.applyUserProfile({...user,signature:''});

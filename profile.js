@@ -39,6 +39,7 @@ $$('.open-profile').forEach(button => button.onclick = () => {
   show('#profileScreen');
 });
 $('#cancelProfile').onclick = () => show(profileReturnScreen);
+$('#backProfile').onclick = () => show(profileReturnScreen);
 $('#profileForm').onsubmit = event => {
   event.preventDefault();
   if (!event.currentTarget.reportValidity()) return;

@@ -12,14 +12,15 @@ function setup() {
     querySelector(id){if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);}
     querySelectorAll(){return this.children.flatMap(n=>n.children).filter(n=>n.tagName==='input');}
     addEventListener(type,fn){this[type]=fn;}
+    showModal(){this.open=true;}close(){this.open=false;}
     reset(){Object.values(this.elements).forEach(n=>n.value='');nodes.get('#procedurePlaceChoices')?.querySelectorAll().forEach(n=>n.checked=false);}
   }
   const open=new Node();buttons.push(open);
-  const document={createElement:tag=>new Node(tag),createTextNode:text=>({textContent:text}),querySelector:id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},querySelectorAll:()=>buttons,getElementById:id=>document.querySelector('#'+id),addEventListener(){}};
+  const document={body:new Node(),createElement:tag=>new Node(tag),createTextNode:text=>({textContent:text}),querySelector:id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},querySelectorAll:()=>buttons,getElementById:id=>document.querySelector('#'+id),addEventListener(){},dispatchEvent(){}};
   const item={id:7,name:'Consulta',price:'200.00',duration:30,place_id:1,place_ids:[1,2]};
-  const c=vm.createContext({document,window:{},location:{hostname:'example.test'},places:{a:{id:1,name:'Local A'},b:{id:2,name:'Local B'}},confirm:()=>true,FormData:class{constructor(form){return Object.entries(form.elements).map(([key,input])=>[key,input.value]);}},fetch:async(url,options)=>{const action=url.split('=')[1];requests.push({action,data:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true,items:[item]})};}});
+  const c=vm.createContext({document,Event,window:{},location:{hostname:'example.test'},places:{a:{id:1,name:'Local A'},b:{id:2,name:'Local B'}},confirm:()=>true,FormData:class{constructor(form){return Object.entries(form.elements).map(([key,input])=>[key,input.value]);}},fetch:async(url,options)=>{const action=url.split('=')[1];requests.push({action,data:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true,items:[item]})};}});
   vm.runInContext(readFileSync(new URL('../procedure-settings.js',import.meta.url),'utf8'),c);
-  return {nodes,requests,open,c};
+  open.click=()=>c.window.procedureSettings.open();return {nodes,requests,open,c};
 }
 
 test('todos os locais seleciona, desmarca e acompanha seleção parcial',async()=>{

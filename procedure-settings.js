@@ -12,10 +12,14 @@
     if (!local) items = (await request('procedures.list')).items;
     return items.flatMap(item => (item.place_ids || [item.place_id]).map(place_id => ({...item, procedure_id:item.id, id:String(item.id)+':'+String(place_id), place_id})));
   }};
-  const section = document.createElement('section');
-  section.className = 'secretary-profile-card';
-  section.innerHTML = `<h2>Configurações da agenda</h2><p>Cadastre cada procedimento com valor, duração e locais de atendimento. Selecione um ou mais locais, ou marque todos. Os locais são cadastrados na tela inicial.</p><form id="procedureForm"><input name="id" type="hidden"><div class="schedule-fields"><label class="field"><span>Procedimento</span><input name="name" maxlength="180" required></label><label class="field"><span>Valor (R$)</span><input name="price" type="number" min="0" max="99999999.99" step="0.01" required></label><label class="field"><span>Duração (minutos)</span><input name="duration" type="number" min="1" max="720" step="1" value="30" required></label><fieldset class="wide"><legend>Locais de atendimento</legend><label class="secretary-place-choice"><input type="checkbox" id="procedureAllPlaces"> Todos os locais</label><div id="procedurePlaceChoices"></div></fieldset></div><div class="schedule-form-actions"><button type="button" class="btn outline" id="procedureNew">Limpar / novo</button><button class="btn blue" type="submit">Salvar procedimento</button></div></form><p id="procedureFeedback" role="status"></p><div id="procedureList"></div>`;
-  document.querySelector('#profileScreen').append(section);
+  const section = document.createElement('dialog');
+  section.id='procedureSettingsDialog';
+  section.className = 'settings-dialog';
+  section.innerHTML = `<header class="agenda-settings-heading"><h2>Configurações de procedimentos</h2><button class="btn outline" type="button" id="procedureSettingsClose">Voltar</button></header><nav class="agenda-settings-tabs"><button class="btn outline" type="button" id="procedureAgendaSettings">Configurações da agenda</button><b>Procedimentos</b></nav><p>Cadastre cada procedimento com valor, duração e locais de atendimento. Selecione um ou mais locais, ou marque todos. Os locais são cadastrados na tela inicial.</p><form id="procedureForm"><input name="id" type="hidden"><div class="schedule-fields"><label class="field"><span>Procedimento</span><input name="name" maxlength="180" required></label><label class="field"><span>Valor (R$)</span><input name="price" type="number" min="0" max="99999999.99" step="0.01" required></label><label class="field"><span>Duração (minutos)</span><input name="duration" type="number" min="1" max="720" step="1" value="30" required></label><fieldset class="wide"><legend>Locais de atendimento</legend><label class="secretary-place-choice"><input type="checkbox" id="procedureAllPlaces"> Todos os locais</label><div id="procedurePlaceChoices"></div></fieldset></div><div class="schedule-form-actions"><button type="button" class="btn outline" id="procedureNew">Limpar / novo</button><button class="btn blue" type="submit">Salvar procedimento</button></div></form><p id="procedureFeedback" role="status"></p><div id="procedureList"></div>`;
+  document.body.append(section);
+  const card=document.createElement('section');card.id='profileProcedureSettings';card.className='secretary-profile-card profile-settings-card';
+  card.innerHTML='<h2>Configurações de procedimentos</h2><p>Procedimentos, valores, duração e locais de atendimento.</p><button class="btn blue" type="button">Abrir configurações de procedimentos</button>';
+  (document.querySelector('#profileSettings')||document.querySelector('#profileScreen')).append(card);
   const form = section.querySelector('form'), feedback = section.querySelector('#procedureFeedback');
   const choices=section.querySelector('#procedurePlaceChoices'),allPlaces=section.querySelector('#procedureAllPlaces');
   const placeInputs=()=>[...choices.querySelectorAll('input')];
@@ -38,7 +42,7 @@
           if(label==='Editar'){for(const key of ['id','name','price','duration'])form.elements[key].value=item[key];placeInputs().forEach(input=>input.checked=ids.includes(input.value));syncAll();return;}
           if(!confirm('Excluir este procedimento? Os agendamentos existentes serão preservados.'))return;
           button.disabled=true;
-          try {if(!local)await request('procedures.delete',{id:item.id});items=items.filter(p=>p.id!==item.id);reset();render();feedback.textContent='Procedimento excluído.';}
+          try {if(!local)await request('procedures.delete',{id:item.id});items=items.filter(p=>p.id!==item.id);reset();render();feedback.textContent='Procedimento excluído.';document.dispatchEvent(new Event('procedures:saved'));}
           catch(e){feedback.textContent=e.message;}finally{button.disabled=false;}
         };
         row.append(button);
@@ -47,7 +51,7 @@
     });
     if(!items.length)list.textContent='Nenhum procedimento cadastrado.';
   }
-  document.querySelectorAll('.open-profile').forEach(button=>button.addEventListener('click',async()=>{
+  async function load() {
     reset();feedback.textContent='Carregando procedimentos…';choices.replaceChildren();
     Object.entries(places).forEach(([key,p])=>{
       const label=document.createElement('label'),input=document.createElement('input');label.className='secretary-place-choice';
@@ -57,7 +61,14 @@
     allPlaces.disabled=!placeInputs().length;syncAll();
     if(!placeInputs().length)choices.textContent='Cadastre um local na tela inicial.';
     try{await window.procedureCatalog.load();render();feedback.textContent=local?'Prévia local: cadastros temporários.':'';}catch(e){feedback.textContent=e.message;}
-  }));
+  }
+  window.procedureSettings={open:async()=>{
+    if(window.currentSessionUser?.secretary_owner_id)return;
+    section.showModal();await load();
+  }};
+  card.querySelector('button').onclick=()=>window.procedureSettings.open();
+  section.querySelector('#procedureSettingsClose').onclick=()=>section.close();
+  section.querySelector('#procedureAgendaSettings').onclick=()=>{section.close();window.agendaSettings.open();};
   section.querySelector('#procedureNew').onclick=()=>{reset();feedback.textContent='';};
   form.onsubmit=async event=>{
     event.preventDefault();const value=Object.fromEntries(new FormData(form));
@@ -67,9 +78,9 @@
     try{
       if(local){value.id=value.id||String(Date.now());items=items.filter(p=>String(p.id)!==String(value.id));items.push(value);}
       else{await request('procedures.save',value);await window.procedureCatalog.load();}
-      reset();render();feedback.textContent='Procedimento salvo.';
+      reset();render();feedback.textContent='Procedimento salvo.';document.dispatchEvent(new Event('procedures:saved'));
     }catch(e){feedback.textContent=e.message;}finally{button.disabled=false;}
   };
-  document.addEventListener('patients:load',()=>{items=[];form.reset();section.querySelector('#procedureList').replaceChildren();});
-  ['logoutButton','logoutRx'].forEach(id=>document.getElementById(id).addEventListener('click',()=>{items=[];form.reset();section.querySelector('#procedureList').replaceChildren();}));
+  document.addEventListener('patients:load',()=>{items=[];form.reset();section.close();section.querySelector('#procedureList').replaceChildren();});
+  ['logoutButton','logoutRx'].forEach(id=>document.getElementById(id).addEventListener('click',()=>{items=[];form.reset();section.close();section.querySelector('#procedureList').replaceChildren();}));
 })();

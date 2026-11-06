@@ -16,7 +16,7 @@
   const controls=document.createElement('div');controls.className='agenda-viewbar';
   controls.innerHTML='<h2 id="agendaDateHeading"></h2><div class="agenda-view-buttons" aria-label="Visualização da agenda"><button type="button" data-view="day">Dia</button><button type="button" data-view="week">Semana</button><button type="button" data-view="month">Mês</button><button type="button" data-view="list">Compromissos</button></div>';
   const aside=document.createElement('aside');aside.className='agenda-sidebar';
-  aside.innerHTML='<button type="button" class="agenda-sidebar-toggle" id="agendaCollapse">› Recolher painel</button><b id="agendaCount"></b><label class="agenda-toggle"><input type="checkbox" id="agendaOnlyValid"> Somente válidos</label><button class="agenda-side-action" id="agendaSearchFocus" type="button">⌕ Buscar agendamento</button><button class="agenda-side-action" id="agendaWaiting" type="button">◷ Pacientes aguardando <b id="agendaWaitingCount">0</b></button><section class="agenda-mini-calendar"><h3>▦ Calendário</h3><div class="agenda-calendar-nav"><button type="button" id="agendaMonthPrevious" aria-label="Mês anterior">‹</button><b id="agendaMonthHeading"></b><button type="button" id="agendaMonthNext" aria-label="Próximo mês">›</button></div><div id="agendaCalendarDays"></div></section><div class="agenda-legend"><span>Agendado</span><span>Confirmado</span><span>Em atendimento</span><span>Finalizado</span></div><button class="agenda-side-action" id="agendaConfigure" type="button">⚙ Configurações da agenda</button><button class="agenda-side-action" id="agendaProcedures" type="button">◇ Procedimentos e valores</button><button class="agenda-side-action" id="agendaPrint" type="button">▤ Imprimir agenda</button><button class="agenda-side-action" id="agendaExport" type="button">↓ Exportar agenda</button>';
+  aside.innerHTML='<button type="button" class="agenda-sidebar-toggle" id="agendaCollapse">› Recolher painel</button><b id="agendaCount"></b><label class="agenda-toggle"><input type="checkbox" id="agendaOnlyValid"> Somente válidos</label><button class="agenda-side-action" id="agendaSearchFocus" type="button">⌕ Buscar agendamento</button><button class="agenda-side-action" id="agendaWaiting" type="button">◷ Pacientes aguardando <b id="agendaWaitingCount">0</b></button><section class="agenda-mini-calendar"><h3>▦ Calendário</h3><div class="agenda-calendar-nav"><button type="button" id="agendaMonthPrevious" aria-label="Mês anterior">‹</button><b id="agendaMonthHeading"></b><button type="button" id="agendaMonthNext" aria-label="Próximo mês">›</button></div><div id="agendaCalendarDays"></div></section><div class="agenda-legend"><span>Agendado</span><span>Confirmado</span><span>Em atendimento</span><span>Finalizado</span></div><button class="agenda-side-action" id="agendaConfigure" type="button">⚙ Configurações da agenda</button><button class="agenda-side-action" id="agendaProcedures" type="button">◇ Configurações de procedimentos</button><button class="agenda-side-action" id="agendaPrint" type="button">▤ Imprimir agenda</button><button class="agenda-side-action" id="agendaExport" type="button">↓ Exportar agenda</button>';
   q('scheduleBody').before(shell);panel.append(controls,q('scheduleBody'));shell.append(panel,aside);
   const isSecretary = () => !!window.currentSessionUser?.secretary_owner_id;
   const originalShow = show;
@@ -297,7 +297,7 @@
   q('agendaSearchFocus').onclick=()=>q('scheduleSearch').focus();
   q('agendaWaiting').onclick=()=>{onlyWaiting=!onlyWaiting;render();};
   q('agendaConfigure').onclick=()=>window.agendaSettings.open();
-  q('agendaProcedures').onclick=()=>document.querySelector('.open-profile')?.click();
+  q('agendaProcedures').onclick=()=>window.procedureSettings.open();
   q('agendaPrint').onclick=()=>window.print();
   q('agendaCollapse').onclick=()=>{const collapsed=aside.classList.toggle('agenda-sidebar-collapsed');q('agendaCollapse').textContent=collapsed?'‹ Expandir painel':'› Recolher painel';};
   for(const [id,step]of [['agendaMonthPrevious',-1],['agendaMonthNext',1]])q(id).onclick=()=>{const date=model.date(monthCursor||q('scheduleDate').value);date.setDate(1);date.setMonth(date.getMonth()+step);monthCursor=model.iso(date);renderCalendar();};
@@ -307,6 +307,7 @@
     const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(escape).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='agenda-'+q('scheduleDate').value+'.csv';link.click();URL.revokeObjectURL(url);
   };
   document.addEventListener('agenda-settings:saved',()=>{monthCursor=null;load();});
+  document.addEventListener('procedures:saved',()=>load());
   for(const host of [document.querySelector('#placesScreen .home-tabs'),document.querySelector('#patientsScreen .top'),document.querySelector('.rx-nav')]) {
     if(!host)continue;host.append(button('Agendamentos',()=>open('agenda')),button('Consultas',()=>open('consultas')));
   }
