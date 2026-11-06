@@ -20,7 +20,7 @@
   const controls=document.createElement('div');controls.className='agenda-viewbar';
   controls.innerHTML='<h2 id="agendaDateHeading"></h2><div class="agenda-view-buttons" aria-label="Visualização da agenda"><button type="button" data-view="day">Dia</button><button type="button" data-view="week">Semana</button><button type="button" data-view="month">Mês</button><button type="button" data-view="list">Compromissos</button></div>';
   const aside=document.createElement('aside');aside.className='agenda-sidebar';
-  aside.innerHTML='<button type="button" class="agenda-sidebar-toggle" id="agendaCollapse">› Recolher painel</button><b id="agendaCount"></b><label class="agenda-toggle"><input type="checkbox" id="agendaOnlyValid"> Somente válidos</label><button class="agenda-side-action" id="agendaSearchFocus" type="button">⌕ Buscar agendamento</button><button class="agenda-side-action" id="agendaWaiting" type="button">◷ Pacientes aguardando <b id="agendaWaitingCount">0</b></button><section class="agenda-mini-calendar"><h3>▦ Calendário</h3><div class="agenda-calendar-nav"><button type="button" id="agendaMonthPrevious" aria-label="Mês anterior">‹</button><b id="agendaMonthHeading"></b><button type="button" id="agendaMonthNext" aria-label="Próximo mês">›</button></div><div id="agendaCalendarDays"></div></section><div class="agenda-legend"><span>Agendado</span><span>Confirmado</span><span>Em atendimento</span><span>Finalizado</span></div><button class="agenda-side-action" id="agendaConfigure" type="button">⚙ Configurações de agendamentos</button><button class="agenda-side-action" id="agendaProcedures" type="button">◇ Configurações de procedimentos</button><button class="agenda-side-action" id="agendaPrint" type="button">▤ Imprimir agenda</button><button class="agenda-side-action" id="agendaExport" type="button">↓ Exportar agenda</button>';
+  aside.innerHTML='<button type="button" class="agenda-sidebar-toggle" id="agendaCollapse">› Recolher painel</button><b id="agendaCount"></b><label class="agenda-toggle"><input type="checkbox" id="agendaOnlyValid"> Somente válidos</label><button class="agenda-side-action" id="agendaSearchFocus" type="button">⌕ Buscar agendamento</button><button class="agenda-side-action" id="agendaWaiting" type="button">◷ Pacientes aguardando <b id="agendaWaitingCount">0</b></button><section class="agenda-mini-calendar"><h3>▦ Calendário</h3><div class="agenda-calendar-nav"><button type="button" id="agendaMonthPrevious" aria-label="Mês anterior">‹</button><b id="agendaMonthHeading"></b><button type="button" id="agendaMonthNext" aria-label="Próximo mês">›</button></div><div id="agendaCalendarDays"></div></section><div class="agenda-legend" aria-label="Cores dos status"></div><button class="agenda-side-action" id="agendaConfigure" type="button">⚙ Configurações de agendamentos</button><button class="agenda-side-action" id="agendaProcedures" type="button">◇ Configurações de procedimentos</button><button class="agenda-side-action" id="agendaPrint" type="button">▤ Imprimir agenda</button><button class="agenda-side-action" id="agendaExport" type="button">↓ Exportar agenda</button>';
   q('scheduleBody').before(shell);panel.append(controls,q('scheduleBody'));shell.append(panel,aside);
   const isSecretary = () => !!window.currentSessionUser?.secretary_owner_id;
   const originalShow = show;
@@ -91,8 +91,12 @@
     q('schedulePatient').replaceChildren(option('','Novo paciente / selecionar cadastro'));
     patients.filter(p=>(p.name+' '+p.cpf).toLocaleLowerCase('pt-BR').includes(search)).forEach(p=>q('schedulePatient').append(option(p.id,`${p.name} · ${p.cpf}`)));
   };
-  statuses.forEach(s=>inputs.status.append(option(s)));
-  statuses.forEach(s=>q('scheduleStatus').append(option(s)));
+  const statusBadge=status=>{const badge=document.createElement('span');badge.className='schedule-status-badge';badge.dataset.scheduleStatus=status;badge.textContent=status;return badge;};
+  screen.querySelector('.agenda-legend').replaceChildren(...statuses.map(statusBadge));
+  for(const select of [inputs.status,q('scheduleStatus')]) {
+    statuses.forEach(status=>{const entry=option(status);entry.dataset.scheduleStatus=status;select.append(entry);});
+    select.onchange=()=>select.dataset.scheduleStatus=select.value;
+  }
   ['Consulta','Retorno','Exame','Procedimento','Teleconsulta','Outro'].forEach(s=>inputs.attendance_type.append(option(s)));
   const request = async (action,data={}) => {
     const response=await fetch('api/index.php?action='+encodeURIComponent(action),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
@@ -188,7 +192,7 @@
     } else {
       const wrap=document.createElement('div');wrap.className='schedule-table-wrap';const table=document.createElement('table');table.className='schedule-table';
       const thead=document.createElement('thead'),head=document.createElement('tr');thead.append(head);table.append(thead);['Ações','Paciente','Horário agendado','Início real','Tempo da consulta','Procedimento / tipo','Local','Status','Convênio'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.append(th);});
-      const tbody=document.createElement('tbody');table.append(tbody);rows.forEach(i=>{const row=document.createElement('tr'),actions=document.createElement('td');tbody.append(row);row.append(actions);if(isSecretary())actions.append(button('Editar agendamento',()=>edit(i)));else{const back=button('Voltar para a consulta',()=>attend(i,true));back.disabled=i.date!==today()||!['Em atendimento','Finalizado'].includes(i.status);back.title=i.date!==today()?'Dispon\u00edvel somente no mesmo dia da consulta':'Reabrir os dados salvos para edi\u00e7\u00e3o';actions.append(back);}if(!isSecretary()&&!['Cancelado','Faltou','Finalizado'].includes(i.status))actions.append(button('Atender',()=>attend(i)));[i.name,`${i.start}–${i.end}`,actualStart(i),actualDuration(i),`${i.procedure} / ${i.attendance_type}`,i.place_name,i.status,i.insurance||'Particular'].forEach(t=>{const cell=document.createElement('td');cell.textContent=t;row.append(cell);});});
+      const tbody=document.createElement('tbody');table.append(tbody);rows.forEach(i=>{const row=document.createElement('tr'),actions=document.createElement('td');tbody.append(row);row.append(actions);if(isSecretary())actions.append(button('Editar agendamento',()=>edit(i)));else{const back=button('Voltar para a consulta',()=>attend(i,true));back.disabled=i.date!==today()||!['Em atendimento','Finalizado'].includes(i.status);back.title=i.date!==today()?'Dispon\u00edvel somente no mesmo dia da consulta':'Reabrir os dados salvos para edi\u00e7\u00e3o';actions.append(back);}if(!isSecretary()&&!['Cancelado','Faltou','Finalizado'].includes(i.status))actions.append(button('Atender',()=>attend(i)));[i.name,`${i.start}–${i.end}`,actualStart(i),actualDuration(i),`${i.procedure} / ${i.attendance_type}`,i.place_name,i.status,i.insurance||'Particular'].forEach((t,index)=>{const cell=document.createElement('td');if(index===6)cell.append(statusBadge(t));else cell.textContent=t;row.append(cell);});});
       if(!rows.length){const row=document.createElement('tr'),cell=document.createElement('td');row.append(cell);tbody.append(row);cell.colSpan=9;cell.textContent='Nenhuma consulta encontrada para os filtros selecionados.';} wrap.append(table);body.append(wrap);
     }
   }
@@ -207,7 +211,7 @@
   function showDetails(item) {
     detailsItem=item;q('scheduleDetailsPatient').textContent=item.name;
     q('scheduleDetailsSummary').textContent=`${item.date.split('-').reverse().join('/')} · ${item.start}–${item.end} · ${item.procedure} · ${item.place_name||'Local não informado'}`;
-    q('scheduleStatus').value=item.status;q('scheduleStatusError').textContent='';
+    q('scheduleStatus').value=item.status;q('scheduleStatus').onchange();q('scheduleStatusError').textContent='';
     detailsDialog.showModal();
   }
   function closeDetails() {if(!statusSaving){detailsDialog.close();detailsItem=null;}}
@@ -235,6 +239,7 @@
     const minutes=model.minutes(time)+Number(settings.default_duration);
     const defaults={date,start:time,end:minutes<1440?model.time(minutes):'',procedure:'Consulta',attendance_type:'Consulta',status:'Agendado'};
     fields.forEach(([name])=>inputs[name].value=String(item?.[name]??defaults[name]??''));
+    inputs.status.onchange();
     q('schedulePatient').replaceChildren(option('','Novo paciente / selecionar cadastro'));
     inputs.cpf.value=formatDoctorCpf(inputs.cpf.value);inputs.phone.value=formatPhone(inputs.phone.value);
     inputs.price.value=item?.price??'0.00';
