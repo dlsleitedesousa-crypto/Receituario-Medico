@@ -23,7 +23,7 @@ function setup(){
   return {nodes,requests,document};
 }
 test('cadastro fica em Meu perfil e edição seleciona somente os locais autorizados',async()=>{
-  const s=setup();assert.equal(s.nodes.get('#profileScreen').children.length,1);
+  const s=setup();assert.equal(s.nodes.get('#profileSettings').children.length,1);
   await s.nodes.get('#manageSecretaries').onclick();
   const row=s.nodes.get('#secretaryAccessList').children[0];row.children[1].onclick();
   assert.deepEqual(s.nodes.get('#secretaryPlaceChoices').querySelectorAll('input').map(n=>n.checked),[false,true]);

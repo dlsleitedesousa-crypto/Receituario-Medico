@@ -27,8 +27,7 @@ function applyUserProfile(user) {
 function profileValues() {
   return { ...additionalDoctorValues('profile'), ...Object.fromEntries(['title', 'name', 'cpf', 'specialty', 'crm', 'rqe', 'email'].map(key => [key, key === 'cpf' ? doctorCpfDigits($('#profileCpf').value) : $('#profile' + key[0].toUpperCase() + key.slice(1)).value.trim()])) };
 }
-$$('.open-profile').forEach(button => button.onclick = () => {
-  profileReturnScreen = '#' + button.closest('.screen').id;
+function populateProfileForm() {
   const user = { ...doctor, email: doctor.email || $('#email').value };
   for (const [key, value] of Object.entries(user)) {
     const input = $('#profile' + key[0].toUpperCase() + key.slice(1));
@@ -36,16 +35,20 @@ $$('.open-profile').forEach(button => button.onclick = () => {
   }
   signatureDrafts.profile = doctor.signature || '';
   renderSignaturePreview('profile');
-  show('#profileScreen');
+}
+$$('.open-profile').forEach(button => button.onclick = () => {
+  profileReturnScreen = '#' + button.closest('.screen').id;
+  populateProfileForm();show('#profileScreen');
 });
-$('#cancelProfile').onclick = () => show(profileReturnScreen);
+$('#openProfileDetails').onclick = () => {populateProfileForm();$('#profileDetailsDialog').showModal();};
+$('#cancelProfile').onclick = $('#closeProfileDetails').onclick = () => $('#profileDetailsDialog').close();
 $('#backProfile').onclick = () => show(profileReturnScreen);
 $('#profileForm').onsubmit = event => {
   event.preventDefault();
   if (!event.currentTarget.reportValidity()) return;
   if (!validDoctorCpf($('#profileCpf').value)) { toast('Informe um CPF válido.'); $('#profileCpf').focus(); return; }
   applyUserProfile(profileValues());
-  show(profileReturnScreen);
+  $('#profileDetailsDialog').close();
   toast('Perfil atualizado nesta prévia.');
 };
 

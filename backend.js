@@ -24,7 +24,7 @@
     try {
       const result = await api('profile.update', profileValues());
       populateUser(result.user);
-      show(profileReturnScreen);
+      $('#profileDetailsDialog').close();
       toast('Perfil atualizado com sucesso.');
     } catch (error) { fail(error); }
     finally { button.disabled = false; }

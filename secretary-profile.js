@@ -1,11 +1,11 @@
 /* Gestão da equipe e dos locais autorizados dentro de Meu perfil. */
 (() => {
-  const host=document.querySelector('#profileScreen');
-  const section=document.createElement('section');section.className='secretary-profile-card';
-  section.innerHTML='<h2>Secretárias</h2><p>Cadastre os acessos da secretaria e escolha os locais em que cada pessoa pode marcar consultas.</p><button class="btn blue" type="button" id="manageSecretaries">Cadastrar e gerenciar secretárias</button>';
+  const host=document.querySelector('#profileSettings')||document.querySelector('#profileScreen');
+  const section=document.createElement('section');section.id='profileSecretarySettings';section.className='secretary-profile-card profile-settings-card';
+  section.innerHTML='<h2>Configurações da secretária</h2><p>Acessos da secretaria, senhas e locais autorizados para agendar.</p><button class="btn blue" type="button" id="manageSecretaries">Abrir configurações</button>';
   host.append(section);
   const dialog=document.createElement('dialog');dialog.id='secretaryAccessDialog';
-  dialog.innerHTML='<form id="secretaryAccessForm"><h2>Cadastro de secretárias</h2><label class="field"><span>Nome</span><input name="name" maxlength="180" required></label><label class="field"><span>E-mail de acesso</span><input name="email" type="email" maxlength="190" required autocomplete="off"></label><label class="field"><span>Senha inicial / nova senha</span><input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password"><small>Obrigatória para novo acesso. Deixe em branco ao editar para manter a senha atual.</small></label><fieldset><legend>Locais em que pode marcar consultas</legend><div id="secretaryPlaceChoices"></div></fieldset><p id="secretaryAccessError" role="alert"></p><div class="schedule-form-actions"><button type="button" class="btn outline" id="secretaryNew">Novo cadastro</button><button class="btn blue" type="submit">Salvar secretária</button><button type="button" class="btn outline" id="secretaryAccessClose">Fechar</button></div><h3>Secretárias cadastradas</h3><div id="secretaryAccessList"></div></form>';
+  dialog.innerHTML='<form id="secretaryAccessForm"><header class="settings-dialog-heading"><h2>Configurações da secretária</h2><button class="btn outline" type="button" id="secretaryAccessTopClose">Voltar</button></header><label class="field"><span>Nome</span><input name="name" maxlength="180" required></label><label class="field"><span>E-mail de acesso</span><input name="email" type="email" maxlength="190" required autocomplete="off"></label><label class="field"><span>Senha inicial / nova senha</span><input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password"><small>Obrigatória para novo acesso. Deixe em branco ao editar para manter a senha atual.</small></label><fieldset><legend>Locais em que pode marcar consultas</legend><div id="secretaryPlaceChoices"></div></fieldset><p id="secretaryAccessError" role="alert"></p><div class="schedule-form-actions"><button type="button" class="btn outline" id="secretaryNew">Novo cadastro</button><button class="btn blue" type="submit">Salvar secretária</button><button type="button" class="btn outline" id="secretaryAccessClose">Fechar</button></div><h3>Secretárias cadastradas</h3><div id="secretaryAccessList"></div></form>';
   document.body.append(dialog);
   const q=id=>dialog.querySelector('#'+id),form=q('secretaryAccessForm');let availablePlaces=[];
   const request=async(action,data={})=>{
@@ -39,7 +39,7 @@
     if(['localhost','127.0.0.1'].includes(location.hostname)){toast('O cadastro de acessos está disponível no site com PHP/MySQL.');return;}
     reset();q('secretaryPlaceChoices').replaceChildren();q('secretaryAccessList').replaceChildren();dialog.showModal();try{await load();}catch(e){q('secretaryAccessError').textContent=e.message;}
   };
-  q('secretaryNew').onclick=reset;q('secretaryAccessClose').onclick=()=>{reset();dialog.close();};
+  q('secretaryNew').onclick=reset;q('secretaryAccessTopClose').onclick=q('secretaryAccessClose').onclick=()=>{reset();dialog.close();};
   form.onsubmit=async event=>{
     event.preventDefault();const place_ids=[...q('secretaryPlaceChoices').querySelectorAll('input:checked')].map(input=>Number(input.value));
     if(!place_ids.length){q('secretaryAccessError').textContent='Selecione pelo menos um local permitido.';return;}

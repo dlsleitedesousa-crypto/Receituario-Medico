@@ -7,7 +7,7 @@ const profile = readFileSync(new URL('../profile.js', import.meta.url), 'utf8');
 function setup() {
   const nodes = new Map();
   const $ = key => {
-    if (!nodes.has(key)) nodes.set(key, { value:'', checked:false, disabled:false, innerHTML:'', classList:{toggle(){}}, addEventListener(type,fn){this[type]=fn;}, removeAttribute(){}, closest(){return {id:'rxScreen'};} });
+    if (!nodes.has(key)) nodes.set(key, { value:'', checked:false, disabled:false, innerHTML:'', classList:{toggle(){}}, addEventListener(type,fn){this[type]=fn;}, removeAttribute(){}, closest(){return {id:'rxScreen'};},showModal(){this.open=true;},close(){this.open=false;} });
     return nodes.get(key);
   };
   const button = $('#openProfile');
@@ -47,6 +47,13 @@ test('voltar no perfil retorna à tela de origem sem salvar alterações',()=>{
   const {context,$,button}=setup();const screens=[];context.show=id=>screens.push(id);context.applyUserProfile(user);
   button.onclick();$('#profileName').value='Rascunho';$('#backProfile').onclick();
   assert.equal(screens.at(-1),'#rxScreen');assert.equal(context.doctor.name,user.name);
+});
+
+test('Meu perfil abre separado e cancelar retorna à central sem alterar dados salvos',()=>{
+ const {context,$,button}=setup();context.applyUserProfile(user);button.onclick();$('#openProfileDetails').onclick();
+ assert.equal($('#profileDetailsDialog').open,true);$('#profileName').value='Rascunho';$('#cancelProfile').onclick();
+ assert.equal($('#profileDetailsDialog').open,false);assert.equal(context.doctor.name,user.name);
+ $('#openProfileDetails').onclick();assert.equal($('#profileName').value,user.name);
 });
 test('perfil antigo e nova sessão deixam a chave desligada',()=>{
   const {context,$}=setup(); context.applyUserProfile(user); $('#useElectronicSignature').checked=true;
