@@ -20,17 +20,19 @@ function formatConsultationDuration(value) {
     button.disabled = false; button.textContent = 'Iniciar atendimento';
     label.textContent = 'Atendimento não iniciado'; render();
   };
-  button.onclick = () => {
+  const start = (initialTime = null) => {
     if (startedAt !== null) return;
     if (document.querySelector('#patientName').value.trim().split(/\s+/).length < 2 || cpf().length !== 11 || patientAge(document.querySelector('#patientBirthDate').value) === null || !selectedPlace?.id) {
       toast('Selecione um local e preencha nome completo, CPF e nascimento do paciente para iniciar o atendimento.'); return;
     }
-    startedAt = Date.now(); patientCpf = cpf();
+    const parsed=initialTime?Date.parse(initialTime):NaN;
+    startedAt = Number.isFinite(parsed)?parsed:Date.now(); patientCpf = cpf();
     label.textContent = 'Início: ' + new Date(startedAt).toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza' });
     button.disabled = true; button.textContent = 'Atendimento em andamento';
     render(); interval = setInterval(render, 1000);
   };
-  window.consultationTimer = { snapshot, reset };
+  button.onclick = () => start();
+  window.consultationTimer = { snapshot, reset, start };
   const originalClearPatient = clearPatient;
   clearPatient = () => { originalClearPatient(); reset(); };
   const clearButton = document.querySelector('#clearPatient');

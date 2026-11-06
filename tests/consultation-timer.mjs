@@ -30,6 +30,13 @@ test('mudar paciente ou sair zera cronômetro e não reutiliza início anterior'
  const s=setup();s.$('#startConsultation').onclick();s.$('#patientDoc').listeners.input();assert.equal(s.context.window.consultationTimer.snapshot(),null);
  s.$('#startConsultation').onclick();s.$('#logoutRx').listeners.click();assert.equal(s.$('#consultationElapsed').textContent,'00:00:00');
 });
+
+test('início automático utiliza o instante confirmado pelo servidor',()=>{
+ const s=setup();s.context.window.consultationTimer.start('2026-10-05T14:55:00Z');
+ assert.equal(s.context.window.consultationTimer.snapshot().started_at,'2026-10-05T14:55:00.000Z');
+ assert.equal(s.$('#consultationElapsed').textContent,'00:05:00');
+ s.advance(10000);assert.equal(s.$('#consultationElapsed').textContent,'00:05:10');
+});
 test('salva somente tempo e atualiza duração mesmo durante janela de deduplicação',async()=>{
  const requests=[];let duration=20;
  const context=vm.createContext({window:{consultationTimer:{snapshot:()=>({started_at:'2026-10-05T15:00:00.000Z',duration_seconds:duration})}},clinicalHistoryInput:{value:''},validPatient:()=>true,selectedPlace:{id:1},patientData:()=>({cpf:'00000000000'}),toast(){},load:async()=>{},request:async(action,data)=>{requests.push({action,data});return action==='appointments.save'?{appointment_id:1,patient_id:1}:{items:[{id:1}]};}});

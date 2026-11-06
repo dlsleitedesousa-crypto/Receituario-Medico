@@ -24,6 +24,8 @@ Arquivos recuperados de https://receita.drdanielleite.com.br/ e da conexão auto
 
 ## Arquivos recuperados
 
+**Consultas** mostra **Horário agendado**, **Início real** e **Tempo da consulta** separadamente. **Atender** registra o início no servidor e inicia automaticamente o cronômetro com esse instante; **Finalizar atendimento** congela a duração efetiva. Os horários reais são armazenados em UTC na tabela `scheduled_visit_timing`, criada automaticamente, e exibidos no fuso America/Fortaleza. Voltar para editar uma consulta finalizada preserva sua duração original. Registros anteriores sem início confirmado mostram **Não registrado**. A duração em andamento é atualizada ao recarregar a lista.
+
 - `index.html`: página principal, com estilos CSS e JavaScript incorporados.
 - `print-summary.js`: recursos de impressão.
 - `backend.js`: integração da página com a API PHP/MySQL da Hostinger.

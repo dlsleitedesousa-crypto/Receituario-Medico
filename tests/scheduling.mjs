@@ -31,6 +31,27 @@ function setup(production=false, secretary=false) {
 const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',place_id:'1',status:'Agendado',insurance:'',notes:'<script>texto de teste</script>'};
 const fill=(s,values={})=>Object.entries({...data,...values}).forEach(([key,value])=>s.inputs[key].value=value);
 
+test('Consultas separa horário agendado, início real e tempo realizado',async()=>{
+  const s=setup(true);
+  s.context.fetch=async()=>({ok:true,json:async()=>({ok:true,items:[
+    {...data,id:1,actual_started_at:'2026-11-05T12:07:00Z',actual_ended_at:'2026-11-05T12:32:10Z',actual_duration_seconds:1510,status:'Finalizado'},
+    {...data,id:2,actual_started_at:null,actual_duration_seconds:null}
+  ]})});
+  s.nodes.get('#scheduleFinished').checked=true;await s.nodes.get('.rx-nav').children[1].onclick();
+  const rows=s.nodes.get('#scheduleBody').children[0].children[0].children[1].children;
+  assert.equal(rows[0].children[2].textContent,'09:00–09:20');assert.equal(rows[0].children[3].textContent,'09:07:00');assert.equal(rows[0].children[4].textContent,'00:25:10');
+  assert.equal(rows[1].children[3].textContent,'Não registrado');assert.equal(rows[1].children[4].textContent,'Não registrado');
+});
+
+test('Atender registra início no servidor e inicia cronômetro com o mesmo instante',async()=>{
+  const s=setup(true),starts=[],requests=[];
+  s.context.window.consultationTimer={snapshot:()=>null,start:value=>starts.push(value)};
+  s.context.fetch=async(url)=>{const action=new URL(url,'https://example.test').searchParams.get('action');requests.push(action);return {ok:true,json:async()=>action==='schedule.start'?{ok:true,started_at:'2026-11-05T12:07:00Z'}:{ok:true,items:[{...data,id:1}]}};};
+  await s.nodes.get('.rx-nav').children[1].onclick();
+  const actions=s.nodes.get('#scheduleBody').children[0].children[0].children[1].children[0].children[0];
+  await actions.children[1].onclick();assert.deepEqual(starts,['2026-11-05T12:07:00Z']);assert.ok(requests.indexOf('schedule.start')>requests.indexOf('schedule.save'));
+});
+
 test('voltar para consulta do dia restaura documento e história sem reabrir status',async()=>{
   const s=setup(true),calls=[];let denied=false;
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());

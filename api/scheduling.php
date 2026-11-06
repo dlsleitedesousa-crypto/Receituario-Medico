@@ -36,6 +36,23 @@ function handleScheduling(PDO $pdo, int $userId, string $action, array $data): n
         details TEXT NOT NULL,
         INDEX idx_schedule_user_date (user_id, visit_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scheduled_visit_timing (
+        visit_id BIGINT UNSIGNED PRIMARY KEY,
+        user_id BIGINT UNSIGNED NOT NULL,
+        started_at DATETIME NOT NULL,
+        ended_at DATETIME NULL,
+        duration_seconds INT UNSIGNED NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    if ($action === 'schedule.start') {
+        $stmt=$pdo->prepare("SELECT id FROM scheduled_visits WHERE id=? AND user_id=? AND status='Em atendimento'");
+        $stmt->execute([(int)($data['id']??0),$userId]);$id=$stmt->fetchColumn();
+        if (!$id) respond(['ok'=>false,'error'=>'Consulta não está em atendimento.'],409);
+        $stmt=$pdo->prepare('INSERT INTO scheduled_visit_timing (visit_id,user_id,started_at) VALUES (?,?,UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE visit_id=VALUES(visit_id)');
+        $stmt->execute([$id,$userId]);
+        $stmt=$pdo->prepare('SELECT started_at FROM scheduled_visit_timing WHERE visit_id=? AND user_id=?');
+        $stmt->execute([$id,$userId]);
+        respond(['ok'=>true,'started_at'=>str_replace(' ','T',$stmt->fetchColumn()).'Z']);
+    }
     if ($action === 'schedule.return') {
         $stmt=$pdo->prepare('SELECT * FROM scheduled_visits WHERE id=? AND user_id=?');
         $stmt->execute([(int)($data['id']??0),$userId]);$visit=$stmt->fetch();
@@ -60,17 +77,22 @@ function handleScheduling(PDO $pdo, int $userId, string $action, array $data): n
         $stmt=$pdo->prepare('SELECT status FROM scheduled_visits WHERE id=? AND user_id=?');
         $stmt->execute([$visit['id'],$userId]);
         if ($stmt->fetchColumn() !== 'Finalizado') respond(['ok'=>false,'error'=>'O agendamento não está em atendimento. Confira o status em Consultas.'],409);
+        $stmt=$pdo->prepare('UPDATE scheduled_visit_timing SET duration_seconds=GREATEST(0,TIMESTAMPDIFF(SECOND,started_at,UTC_TIMESTAMP())),ended_at=UTC_TIMESTAMP() WHERE visit_id=? AND user_id=? AND ended_at IS NULL');
+        $stmt->execute([$visit['id'],$userId]);
         respond(['ok'=>true]);
     }
     if ($action === 'schedule.list') {
         $date = (string)($data['date'] ?? '');
-        $stmt = $pdo->prepare('SELECT s.*,p.name AS patient_name,p.cpf,p.birth_date,p.phone,l.name AS place_name FROM scheduled_visits s JOIN patients p ON p.id=s.patient_id AND p.user_id=s.user_id JOIN places l ON l.id=s.place_id AND l.user_id=s.user_id WHERE s.user_id=? AND s.visit_date=? ORDER BY s.start_time,s.id');
+        $stmt = $pdo->prepare('SELECT s.*,p.name AS patient_name,p.cpf,p.birth_date,p.phone,l.name AS place_name,t.started_at AS actual_started_at,t.ended_at AS actual_ended_at,CASE WHEN t.ended_at IS NULL THEN GREATEST(0,TIMESTAMPDIFF(SECOND,t.started_at,UTC_TIMESTAMP())) ELSE t.duration_seconds END AS actual_duration_seconds FROM scheduled_visits s JOIN patients p ON p.id=s.patient_id AND p.user_id=s.user_id JOIN places l ON l.id=s.place_id AND l.user_id=s.user_id LEFT JOIN scheduled_visit_timing t ON t.visit_id=s.id AND t.user_id=s.user_id WHERE s.user_id=? AND s.visit_date=? ORDER BY s.start_time,s.id');
         $stmt->execute([$userId, $date]);
         $items = [];
         foreach ($stmt->fetchAll() as $row) {
             if (!secretaryCanUsePlace((int)$row['place_id'])) continue;
             $details = json_decode($row['details'], true) ?: [];
-            $items[] = array_merge($details, ['id'=>$row['id'],'patient_id'=>$row['patient_id'],'place_id'=>$row['place_id'],'place_name'=>$row['place_name'],'name'=>$row['patient_name'],'cpf'=>$row['cpf'],'birth_date'=>$row['birth_date'],'phone'=>$row['phone'],'date'=>$row['visit_date'],'start'=>substr($row['start_time'],0,5),'end'=>substr($row['end_time'],0,5),'status'=>$row['status']]);
+            $items[] = array_merge($details, ['id'=>$row['id'],'patient_id'=>$row['patient_id'],'place_id'=>$row['place_id'],'place_name'=>$row['place_name'],'name'=>$row['patient_name'],'cpf'=>$row['cpf'],'birth_date'=>$row['birth_date'],'phone'=>$row['phone'],'date'=>$row['visit_date'],'start'=>substr($row['start_time'],0,5),'end'=>substr($row['end_time'],0,5),'status'=>$row['status'],
+                'actual_started_at'=>$row['actual_started_at']?str_replace(' ','T',$row['actual_started_at']).'Z':null,
+                'actual_ended_at'=>$row['actual_ended_at']?str_replace(' ','T',$row['actual_ended_at']).'Z':null,
+                'actual_duration_seconds'=>$row['actual_started_at']?(int)$row['actual_duration_seconds']:null]);
         }
         respond(['ok'=>true,'items'=>$items]);
     }
