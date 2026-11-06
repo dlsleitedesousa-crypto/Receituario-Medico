@@ -4,6 +4,7 @@ function resetPrintSummary(){printSummaryEntries=[]}
 function capturePrintSummary(){
   const type=$('.type-card.active')?.dataset.type||'personalizado';
   return {
+    type, placeId:selectedPlace?.id,
     title:type==='especial'?'Receita de Controle Especial':$('#paperTitle').textContent,
     patient:$('#patientName').value.trim()||'Não informado',cpf:$('#patientDoc').value,
     birthDate:$('#patientBirthDate').value,age:patientAge($('#patientBirthDate').value),
@@ -14,6 +15,23 @@ function capturePrintSummary(){
     requestedAt:new Date().toLocaleString('pt-BR')
   };
 }
+window.savePrintedDocument = async entry => {
+  if (entry.savedRecord) return entry.savedRecord;
+  if (entry.savePromise) return entry.savePromise;
+  entry.savePromise = window.saveAppointmentRecord({type:entry.type||'personalizado',title:entry.title,text:entry.text.trim(),date:entry.date});
+  try {
+    const saved=await entry.savePromise;
+    if (!saved) throw Error('Não foi possível salvar o documento impresso: '+entry.title);
+    entry.savedRecord=saved;return saved;
+  } finally {entry.savePromise=null;}
+};
+window.savePrintedDocuments = async () => {
+  const cpf=$('#patientDoc').value.replace(/\D/g,'');
+  const entries=printSummaryEntries.filter(entry=>String(entry.cpf||'').replace(/\D/g,'')===cpf&&String(entry.placeId)===String(selectedPlace?.id));
+  const saved=[];
+  for(const entry of entries)saved.push(await window.savePrintedDocument(entry));
+  return saved;
+};
 function printSummaryText(entry){
   const formatDate=value=>value?value.split('-').reverse().join('/'):'Não informada';
   return [entry.title,'Paciente: '+entry.patient,

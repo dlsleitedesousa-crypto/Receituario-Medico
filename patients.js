@@ -447,7 +447,9 @@
     if (button.disabled || finishButton.disabled) return;
     button.disabled = true; finishButton.disabled = true;
     try {
-      const saved = await saveAppointmentRecord({
+      const printed = finish ? await window.savePrintedDocuments?.() || [] : [];
+      const hasCurrentContent = document.querySelector('#rxText').value.trim() || clinicalHistoryInput.value.trim() || window.consultationTimer?.snapshot();
+      const saved = finish && printed.length && !hasCurrentContent ? printed[printed.length-1] : await saveAppointmentRecord({
         type: document.querySelector('.type-card.active')?.dataset.type,
         title: document.querySelector('.type-card.active')?.dataset.type === 'especial'
           ? 'Receita de Controle Especial' : document.querySelector('#paperTitle').textContent.trim(),
@@ -457,6 +459,7 @@
       if (saved && finish) {
         await window.finishScheduledVisit?.();
         window.consultationTimer?.reset();
+        await window.openConsultations?.();
         toast(saved.historyReady ? 'Atendimento finalizado e salvo no histórico do paciente.' : 'Atendimento finalizado. Reabra o cadastro para consultar o histórico.');
       } else if (saved?.historyReady) toast('Atendimento salvo no histórico do paciente.');
     } catch (error) { notifyError(error); }

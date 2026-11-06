@@ -199,6 +199,7 @@
   document.addEventListener('patients:load',()=>{activeVisit=null;catalog=[];drafts.clear();});
   ['logoutButton','logoutRx'].forEach(id=>document.querySelector('#'+id).addEventListener('click',()=>{activeVisit=null;catalog=[];drafts.clear();}));
   function open(target) {mode=target;if(target==='consultas'){q('scheduleDate').value=today();q('scheduleSearch').value='';q('schedulePlaceFilter').value='';}refreshPlaces();show('#schedulingScreen');return load();}
+  window.openConsultations=()=>open('consultas');
   for(const host of [document.querySelector('#placesScreen .home-tabs'),document.querySelector('#patientsScreen .top'),document.querySelector('.rx-nav')]) {
     if(!host)continue;host.append(button('Agendamentos',()=>open('agenda')),button('Consultas',()=>open('consultas')));
   }

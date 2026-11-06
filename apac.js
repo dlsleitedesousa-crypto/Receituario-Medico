@@ -183,9 +183,9 @@
         text:`Procedimento: ${procedure}\nCódigo SIGTAP: ${code}\nQuantidade: ${quantity}\nCID-10: ${cid}\nDiagnóstico: ${diagnosis}\nObservações: ${notes}`,
         date:$('#rxDate').value, professional:doctor.name, place:place.name || '', address:place.address || '',
         phone:place.phone || '', cnpj:place.cnpj || '', cnes:place.cnes || '', requestedAt:new Date().toLocaleString('pt-BR')};
-      printSummaryEntries.push(entry);
+      entry.type='apac';entry.placeId=place.id;printSummaryEntries.push(entry);
       try {
-        const saved = await window.saveAppointmentRecord({ type: 'apac', title: entry.title, text: entry.text, date: $('#rxDate').value });
+        const saved = await window.savePrintedDocument(entry);
         if (saved?.historyReady) toast('APAC salva no histórico do paciente.');
       } catch (error) { toast(error.message || 'Não foi possível salvar a APAC no histórico.'); }
     }).finally(() => { submit.disabled = false; submit.textContent = originalLabel; });

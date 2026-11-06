@@ -130,9 +130,9 @@
       if (await openAihTemplatePdf(values)) {
         close();
         const entry = { title: 'Solicitação de AIH', patient, cpf: document.querySelector('#patientDoc').value, birthDate: document.querySelector('#patientBirthDate').value, age: patientAge(document.querySelector('#patientBirthDate').value), text: `Procedimento: ${values.procedure}\nCódigo SIGTAP: ${values.code}\nCID-10: ${values.cid}\nDiagnóstico: ${values.diagnosis}\nSinais e sintomas: ${values.symptoms}\nCondições: ${values.conditions}\nResultados diagnósticos: ${values.tests}`, date: document.querySelector('#rxDate').value, professional: doctor.name, place: place.name || '', address: place.address || '', phone: place.phone || '', cnpj: place.cnpj || '', cnes: place.cnes || '', requestedAt: new Date().toLocaleString('pt-BR') };
-        printSummaryEntries.push(entry);
+        entry.type='aih';entry.placeId=place.id;printSummaryEntries.push(entry);
         try {
-          const saved = await window.saveAppointmentRecord({ type: 'aih', title: entry.title, text: entry.text, date: document.querySelector('#rxDate').value });
+          const saved = await window.savePrintedDocument(entry);
           if (saved?.historyReady) toast('AIH salva no histórico do paciente.');
         } catch (error) { toast(error.message || 'Não foi possível salvar a AIH no histórico.'); }
       }
