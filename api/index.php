@@ -147,6 +147,10 @@ try {
     if (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'phone'")->fetch()) {
         $pdo->exec("ALTER TABLE patients ADD COLUMN phone VARCHAR(30) NOT NULL DEFAULT '' AFTER birth_date");
     }
+    if (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'profile'")->fetch()) {
+        try { $pdo->exec("ALTER TABLE patients ADD COLUMN profile TEXT NULL"); }
+        catch (PDOException $error) { if ((int)($error->errorInfo[1] ?? 0) !== 1060) throw $error; }
+    }
     $schemaTable = 'appointments';
     $pdo->exec("CREATE TABLE IF NOT EXISTS appointments (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -321,9 +325,15 @@ try {
     }
 
     if ($action === 'patients.list') {
-        $stmt = $pdo->prepare('SELECT p.id,p.name,p.cpf,p.birth_date,p.phone,COUNT(a.id) AS appointments FROM patients p LEFT JOIN appointments a ON a.patient_id=p.id AND a.user_id=p.user_id WHERE p.user_id=? GROUP BY p.id ORDER BY p.name,p.id');
+        $stmt = $pdo->prepare('SELECT p.id,p.name,p.cpf,p.birth_date,p.phone,p.profile,COUNT(a.id) AS appointments FROM patients p LEFT JOIN appointments a ON a.patient_id=p.id AND a.user_id=p.user_id WHERE p.user_id=? GROUP BY p.id ORDER BY p.id DESC');
         $stmt->execute([$userId]);
-        respond(['ok' => true, 'items' => $stmt->fetchAll()]);
+        $items = [];
+        foreach ($stmt->fetchAll() as $patient) {
+            $profile = json_decode($patient['profile'] ?? '{}',true);
+            unset($patient['profile']);
+            $items[] = array_merge(is_array($profile) ? $profile : [],$patient);
+        }
+        respond(['ok' => true, 'items' => $items]);
     }
     if ($action === 'patients.history') {
         $patientId = (int)($data['id'] ?? 0);
@@ -361,13 +371,19 @@ try {
             respond(['ok' => false, 'error' => 'Informe nome completo, CPF com 11 dígitos e data de nascimento válida.'], 422);
         }
         if (mb_strlen($phone) > 30) respond(['ok' => false, 'error' => 'O telefone deve ter no máximo 30 caracteres.'], 422);
+        require_once __DIR__.'/patients.php';
+        try { $profile = patientAdditionalFields($data); }
+        catch (InvalidArgumentException $error) { respond(['ok'=>false,'error'=>$error->getMessage()],422); }
         if ($action === 'patients.update') {
             $patientId = (int)($data['id'] ?? 0);
-            $stmt = $pdo->prepare('SELECT id FROM patients WHERE id=? AND user_id=?');
+            $stmt = $pdo->prepare('SELECT id,profile FROM patients WHERE id=? AND user_id=?');
             $stmt->execute([$patientId, $userId]);
-            if (!$stmt->fetch()) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
-            $stmt = $pdo->prepare('UPDATE patients SET name=?,cpf=?,birth_date=?,phone=? WHERE id=? AND user_id=?');
-            $stmt->execute([$name, $cpf, $birth, $phone, $patientId, $userId]);
+            $existing = $stmt->fetch();
+            if (!$existing) respond(['ok' => false, 'error' => 'Paciente não encontrado.'], 404);
+            $existingProfile = json_decode($existing['profile'] ?? '{}',true);
+            $profile = array_merge(is_array($existingProfile) ? $existingProfile : [],$profile);
+            $stmt = $pdo->prepare('UPDATE patients SET name=?,cpf=?,birth_date=?,phone=?,profile=? WHERE id=? AND user_id=?');
+            $stmt->execute([$name, $cpf, $birth, $phone, json_encode($profile,JSON_UNESCAPED_UNICODE), $patientId, $userId]);
             respond(['ok' => true, 'patient_id' => $patientId]);
         }
         if ($action === 'appointments.save') {
@@ -402,6 +418,10 @@ try {
             : 'INSERT INTO patients (user_id,name,cpf,birth_date,phone) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),birth_date=VALUES(birth_date),id=LAST_INSERT_ID(id)');
         $stmt->execute([$userId,$name,$cpf,$birth,$phone]);
         $patientId = (int)$pdo->lastInsertId();
+        if ($action === 'patients.save' && $profile) {
+            $stmt = $pdo->prepare('UPDATE patients SET profile=? WHERE id=? AND user_id=?');
+            $stmt->execute([json_encode($profile,JSON_UNESCAPED_UNICODE),$patientId,$userId]);
+        }
         if ($action === 'appointments.save') {
             // The patient upsert above serializes concurrent saves for this patient.
             if ($consultationStart) {

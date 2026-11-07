@@ -10,6 +10,18 @@
   const registrationForm = document.querySelector('#patientRegistrationForm');
   const registrationHeading = registrationForm.querySelector('h2');
   const registrationButton = document.querySelector('#registerPatientButton');
+  const optionalFields = {
+    sex:'Sex',gender:'Gender',rg:'Rg',rg_issuer:'RgIssuer',marital_status:'MaritalStatus',
+    passport:'Passport',birth_certificate:'BirthCertificate',email:'Email',landline:'Landline',other_phone:'OtherPhone',
+    postal_code:'PostalCode',street:'Street',number:'Number',complement:'Complement',neighborhood:'Neighborhood',
+    city:'City',state:'State',ibge_code:'IbgeCode',birthplace:'Birthplace',insurance:'Insurance',
+    insurance_plan:'InsurancePlan',insurance_card:'InsuranceCard',notes:'Notes'
+  };
+  const registrationInputs = Object.fromEntries(Object.entries({name:'Name',cpf:'Cpf',birth_date:'BirthDate',phone:'Phone',...optionalFields})
+    .map(([key,suffix])=>[key,document.querySelector('#newPatient'+suffix)]));
+  const registrationError = document.querySelector('#patientRegistrationError');
+  const directoryHost = document.querySelector('#patientDirectoryHost');
+  let page = 1;
   const cancelEditButton = document.createElement('button');
   cancelEditButton.type = 'button';
   cancelEditButton.className = 'btn outline hidden';
@@ -20,8 +32,11 @@
     editingPatientId = null;
     registrationForm.reset();
     registrationHeading.textContent = 'Cadastrar paciente';
-    registrationButton.textContent = 'Cadastrar paciente';
+    registrationButton.textContent = 'Salvar novo paciente';
     cancelEditButton.classList.add('hidden');
+    registrationError.textContent = '';
+    registrationForm.classList.add('hidden');
+    directoryHost.classList.remove('hidden');
   };
   cancelEditButton.onclick = stopEditing;
   document.querySelector('#patientDirectoryHost').append(patientsPanel);
@@ -49,12 +64,9 @@
     cpf: document.querySelector('#patientDoc').value.replace(/\D/g, ''),
     birth_date: document.querySelector('#patientBirthDate').value
   });
-  const registrationData = () => ({
-    name: document.querySelector('#newPatientName').value.trim(),
-    cpf: document.querySelector('#newPatientCpf').value.replace(/\D/g, ''),
-    birth_date: document.querySelector('#newPatientBirthDate').value,
-    phone: document.querySelector('#newPatientPhone').value.trim()
-  });
+  const registrationData = () => Object.fromEntries(Object.entries(registrationInputs)
+    .map(([key,input])=>[key,key==='cpf'?input.value.replace(/\D/g,''):input.value.trim()]));
+  document.querySelector('#newPatientBirthDate').max = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   document.querySelector('#newPatientCpf').addEventListener('input', event => {
     const digits = event.target.value.replace(/\D/g, '').slice(0, 11);
     event.target.value = digits.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
@@ -280,6 +292,32 @@
     if (!lookupContainer.contains(event.target)) hideSuggestions();
   });
   document.querySelector('#clearPatient').addEventListener('click', () => { selectedPatientId = null; hideSuggestions(); });
+  const updateRegistrationSummary = () => {
+    const data = registrationData(), age = patientAge(data.birth_date);
+    for (const [suffix,value] of Object.entries({Name:data.name||'Novo paciente',Age:age===null?'—':age+' anos',
+      Cpf:formatCpf(data.cpf),Phone:data.phone,Email:data.email,City:[data.city,data.state].filter(Boolean).join(' / ')})) {
+      document.querySelector('#patientSummary'+suffix).textContent=value||'—';
+    }
+  };
+  registrationForm.addEventListener('input',updateRegistrationSummary);
+  registrationForm.addEventListener('change',updateRegistrationSummary);
+  const openRegistration = (patient=null) => {
+    registrationForm.reset();editingPatientId=patient?.id??null;
+    Object.entries(registrationInputs).forEach(([key,input])=>input.value=patient?.[key]||'');
+    registrationInputs.cpf.value=formatCpf(registrationInputs.cpf.value);
+    registrationHeading.textContent=patient?'Editar paciente':'Cadastrar paciente';
+    registrationButton.textContent=patient?'Salvar alterações':'Salvar novo paciente';
+    document.querySelector('#patientSummaryCode').textContent=patient?'Código: '+patient.id:'Novo paciente';
+    registrationError.textContent='';cancelEditButton.classList.toggle('hidden',!patient);
+    directoryHost.classList.add('hidden');registrationForm.classList.remove('hidden');
+    registrationForm.querySelectorAll('details').forEach(section=>section.open=true);
+    updateRegistrationSummary();registrationForm.scrollIntoView({block:'start'});registrationInputs.name.focus();
+  };
+  document.querySelector('#newPatientButton').onclick=()=>openRegistration();
+  document.querySelector('#backPatientDirectory').onclick=stopEditing;
+  document.querySelectorAll('.patient-form-nav a').forEach(link=>link.addEventListener('click',()=>{
+    document.querySelector(link.getAttribute('href')).open=true;
+  }));
   const showHistory = async patient => {
     detail.classList.remove('hidden');
     document.querySelector('#patientDetailName').textContent = patient.name;
@@ -292,85 +330,63 @@
     } catch (error) { history.textContent = ''; notifyError(error); }
   };
   document.querySelector('#closePatientDetail').onclick = () => detail.classList.add('hidden');
+  const filterPatients = (rows,filters) => rows.filter(patient =>
+    (!filters.code || String(patient.id)===filters.code) &&
+    (!filters.name || foldName(patient.name).includes(foldName(filters.name))) &&
+    (!filters.cpf || patient.cpf.includes(filters.cpf)) &&
+    (!filters.birth || patient.birth_date===filters.birth) &&
+    (!filters.phone || String(patient.phone||'').replace(/\D/g,'').includes(filters.phone)));
   const render = () => {
-    const query = search.value.toLocaleLowerCase('pt-BR').replace(/\D/g, '');
-    const nameQuery = search.value.toLocaleLowerCase('pt-BR').trim();
-    list.replaceChildren();
-    const matching = patients.filter(p => !nameQuery || p.name.toLocaleLowerCase('pt-BR').includes(nameQuery) || (query && p.cpf.includes(query)));
-    if (!matching.length) {
-      const empty = document.createElement('p');
-      empty.textContent = 'Nenhum paciente encontrado.';
-      list.append(empty);
-      return;
-    }
-    matching.forEach(patient => {
-      const row = document.createElement('article');
-      row.className = 'patient-row';
-      row.tabIndex = 0;
-      row.setAttribute('aria-label', `Ver histórico de ${patient.name}`);
-      row.onclick = event => { if (!event.target.closest('button')) showHistory(patient); };
-      row.onkeydown = event => { if (event.target === row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); showHistory(patient); } };
-      const info = document.createElement('div');
-      const title = document.createElement('strong');
-      title.textContent = patient.name;
-      const details = document.createElement('small');
-      details.textContent = `CPF ${formatCpf(patient.cpf)} · Nascimento ${formatDate(patient.birth_date)}${patient.phone ? ` · Telefone ${patient.phone}` : ''} · ${patient.appointments} atendimento(s)`;
-      info.append(title, details);
-      const historyButton = document.createElement('button');
-      historyButton.type = 'button';
-      historyButton.className = 'btn blue';
-      historyButton.textContent = 'Ver histórico';
-      historyButton.onclick = () => showHistory(patient);
-      const editButton = document.createElement('button');
-      editButton.type = 'button';
-      editButton.className = 'btn outline';
-      editButton.textContent = 'Editar';
-      editButton.onclick = () => {
-        editingPatientId = patient.id;
-        document.querySelector('#newPatientName').value = patient.name;
-        document.querySelector('#newPatientCpf').value = formatCpf(patient.cpf);
-        document.querySelector('#newPatientBirthDate').value = patient.birth_date;
-        document.querySelector('#newPatientPhone').value = patient.phone || '';
-        registrationHeading.textContent = `Editar paciente: ${patient.name}`;
-        registrationButton.textContent = 'Salvar alterações';
-        cancelEditButton.classList.remove('hidden');
-        registrationForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        document.querySelector('#newPatientName').focus();
-      };
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'btn outline';
-      button.textContent = 'Usar paciente';
-      button.onclick = () => {
-        choosePatient(patient);
-        selectTab('places');
-        toast('Paciente selecionado. Clique em “Atender” no local desejado.');
-      };
-      const deleteButton = document.createElement('button');
-      deleteButton.type = 'button';
-      deleteButton.className = 'btn red';
-      deleteButton.textContent = 'Excluir';
-      deleteButton.onclick = async () => {
-        const count = Number(patient.appointments) || 0;
-        const warning = count ? ` e ${count} atendimento(s) salvo(s)` : '';
-        if (!confirm(`Excluir definitivamente o cadastro de ${patient.name}${warning}? Esta ação não pode ser desfeita.`)) return;
-        deleteButton.disabled = true;
-        try {
-          await request('patients.delete', { id: patient.id });
-          if (editingPatientId === patient.id) stopEditing();
-          if (document.querySelector('#patientDoc').value.replace(/\D/g, '') === patient.cpf) clearPatient();
-          detail.classList.add('hidden');
-          await load();
-          toast('Paciente e atendimentos vinculados excluídos.');
-        } catch (error) { notifyError(error); }
-        finally { deleteButton.disabled = false; }
-      };
-      const actions = document.createElement('div');
-      actions.className = 'patient-row-actions';
-      actions.append(historyButton, editButton, button, deleteButton);
-      row.append(info, actions);
-      list.append(row);
+    const matching = filterPatients(patients,{
+      code:document.querySelector('#patientCodeFilter').value.trim(),name:search.value.trim(),
+      cpf:document.querySelector('#patientCpfFilter').value.replace(/\D/g,''),
+      birth:document.querySelector('#patientBirthFilter').value,
+      phone:document.querySelector('#patientPhoneFilter').value.replace(/\D/g,'')
     });
+    const size=Number(document.querySelector('#patientPageSize').value)||50;
+    const pages=Math.max(1,Math.ceil(matching.length/size));page=Math.min(page,pages);
+    document.querySelector('#patientResultCount').textContent='('+matching.length+')';
+    document.querySelector('#patientPageInfo').textContent='Página '+page+' de '+pages;
+    document.querySelector('#patientPreviousPage').disabled=page<=1;
+    document.querySelector('#patientNextPage').disabled=page>=pages;
+    list.replaceChildren();
+    const table=document.createElement('table');table.className='patient-directory-table';
+    const caption=document.createElement('caption');caption.className='patient-sr-only';caption.textContent='Pacientes cadastrados';table.append(caption);
+    const thead=document.createElement('thead'),head=document.createElement('tr');thead.append(head);table.append(thead);
+    ['Código','Nome completo','Data de nascimento','Sexo','Celular','CPF','Cidade','Ações'].forEach(label=>{
+      const cell=document.createElement('th');cell.scope='col';cell.textContent=label;head.append(cell);
+    });
+    const body=document.createElement('tbody');table.append(body);
+    const action=(label,fn,className='outline')=>{const button=document.createElement('button');button.type='button';button.className='btn '+className;button.textContent=label;button.onclick=fn;return button;};
+    matching.slice((page-1)*size,page*size).forEach(patient=>{
+      const row=document.createElement('tr');row.tabIndex=0;row.setAttribute('aria-label','Abrir cadastro de '+patient.name);
+      row.onclick=event=>{if(!event.target.closest('button'))openRegistration(patient);};
+      row.onkeydown=event=>{if(event.target===row&&['Enter',' '].includes(event.key)){event.preventDefault();openRegistration(patient);}};
+      const age=patientAge(patient.birth_date);
+      [patient.id,patient.name,formatDate(patient.birth_date)+(age===null?'':' · '+age+' anos'),patient.sex||'—',patient.phone||'—',formatCpf(patient.cpf),[patient.city,patient.state].filter(Boolean).join(' / ')||'—'].forEach((value,index)=>{
+        const cell=document.createElement('td');
+        if(index===1)cell.append(action(value,()=>openRegistration(patient),'patient-name-link'));
+        else cell.textContent=value;
+        row.append(cell);
+      });
+      const actions=document.createElement('td');actions.className='patient-table-actions';
+      const use=()=>{choosePatient(patient);selectTab('places');toast('Paciente selecionado. Clique em “Atender” no local desejado.');};
+      const remove=action('Excluir',async()=>{
+        const count=Number(patient.appointments)||0;
+        if(!confirm('Excluir definitivamente o cadastro de '+patient.name+(count?' e '+count+' atendimento(s) salvo(s)':'')+'? Esta ação não pode ser desfeita.'))return;
+        remove.disabled=true;
+        try {
+          await request('patients.delete',{id:patient.id});
+          if(editingPatientId===patient.id)stopEditing();
+          if(patientCpfInput.value.replace(/\D/g,'')===patient.cpf)clearPatient();
+          detail.classList.add('hidden');await load();toast('Paciente e atendimentos vinculados excluídos.');
+        } catch(error){notifyError(error);}finally{remove.disabled=false;}
+      },'red');
+      actions.append(action('Histórico',()=>showHistory(patient)),action('Usar paciente',use),remove);
+      row.append(actions);body.append(row);
+    });
+    if(!matching.length){const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=8;cell.className='patient-empty';cell.textContent='Nenhum paciente encontrado para os filtros selecionados.';row.append(cell);body.append(row);}
+    list.append(table);
   };
   const load = async () => {
     patients = (await request('patients.list')).items;
@@ -378,15 +394,22 @@
     render();
     if (document.activeElement === patientNameInput) renderSuggestions();
   };
-  search.addEventListener('input', render);
+  for(const selector of ['#patientSearch','#patientCodeFilter','#patientCpfFilter','#patientBirthFilter','#patientPhoneFilter']) {
+    document.querySelector(selector).addEventListener('input',()=>{page=1;render();});
+  }
+  document.querySelector('#patientPageSize').onchange=()=>{page=1;render();};
+  document.querySelector('#patientPreviousPage').onclick=()=>{page=Math.max(1,page-1);render();};
+  document.querySelector('#patientNextPage').onclick=()=>{page++;render();};
   document.addEventListener('schedule:saved', () => { patientsLoaded = false; load().catch(notifyError); });
   registrationForm.onsubmit = async event => {
     event.preventDefault();
+    if (registrationButton.disabled) return;
     const data = registrationData();
     if (data.name.split(/\s+/).length < 2 || data.cpf.length !== 11 || patientAge(data.birth_date) === null) {
-      toast('Informe nome completo, CPF com 11 dígitos e data de nascimento válida.');
+      registrationError.textContent='Informe nome completo, CPF com 11 dígitos e data de nascimento válida.';
       return;
     }
+    registrationError.textContent='';
     const button = registrationButton;
     button.disabled = true;
     try {
@@ -396,7 +419,7 @@
       await load();
       detail.classList.add('hidden');
       toast(wasEditing ? 'Dados do paciente atualizados.' : 'Paciente cadastrado.');
-    } catch (error) { notifyError(error); }
+    } catch (error) { registrationError.textContent=error.message||'Não foi possível salvar o cadastro.'; }
     finally { button.disabled = false; }
   };
   document.querySelector('#savePatient').onclick = async () => {
@@ -467,6 +490,6 @@
   };
   document.querySelector('#saveAppointment').onclick = () => persistCurrentAppointment();
   document.querySelector('#finishAppointment').onclick = () => persistCurrentAppointment(true);
-  document.addEventListener('patients:load', () => { clearClinicalHistory(); recentAppointments.clear(); patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); load().catch(notifyError); });
+  document.addEventListener('patients:load', () => { clearClinicalHistory(); recentAppointments.clear(); patients = []; patientsLoaded = false; hideSuggestions(); stopEditing(); detail.classList.add('hidden'); selectTab('places'); page=1;for(const id of ['patientSearch','patientCodeFilter','patientCpfFilter','patientBirthFilter','patientPhoneFilter'])document.querySelector('#'+id).value=''; load().catch(notifyError); });
   document.querySelector('#backPlaces').addEventListener('click', () => load().catch(notifyError));
 })();
