@@ -31,7 +31,7 @@
     originalShow(id);
   };
   const fields = [
-    ['name','Paciente / nome completo','text',180,true],['place_id','Local','select',null,true],['date','Data do atendimento','date',null,true],['start','Hora inicial','time',null,true],['end','Hora final','time',null,true],['status','Status','select',null,true],['procedure','Procedimento','select',null,true],['attendance_type','Tipo de atendimento','select',null,true],['visit_mode','Modalidade do atendimento','select',null,true],['price','Valor (R$)','number',null,true],['cpf','CPF','text',14,true],['birth_date','Data de nascimento','date',null,true],['sex','Sexo biológico','select',null,false],['phone','Telefone celular','tel',15,false],['email','E-mail','email',190,false],['city','Cidade','text',180,false],['notes','Observações do agendamento','textarea',4000,false]
+    ['name','Paciente / nome completo','text',180,true],['place_id','Local','select',null,true],['date','Data do atendimento','date',null,true],['start','Hora inicial','time',null,true],['end','Hora final','time',null,true],['status','Status','select',null,true],['procedure','Procedimento','select',null,true],['visit_mode','Modalidade do atendimento','select',null,true],['price','Valor (R$)','number',null,true],['cpf','CPF','text',14,true],['birth_date','Data de nascimento','date',null,true],['sex','Sexo biológico','select',null,false],['phone','Telefone celular','tel',15,false],['email','E-mail','email',190,false],['city','Cidade','text',180,false],['notes','Observações do agendamento','textarea',4000,false]
   ];
   const inputs = {};
   const option = (value, label=value) => { const el=document.createElement('option'); el.value=value; el.textContent=label; return el; };
@@ -107,7 +107,6 @@
     statuses.forEach(status=>{const entry=option(status);entry.dataset.scheduleStatus=status;select.append(entry);});
     select.onchange=()=>select.dataset.scheduleStatus=select.value;
   }
-  ['Consulta','Retorno','Exame','Procedimento','Teleconsulta','Outro'].forEach(s=>inputs.attendance_type.append(option(s)));
   ['Presencial','On-line'].forEach(s=>inputs.visit_mode.append(option(s)));
   const visitMode=item=>item.visit_mode||(item.attendance_type==='Teleconsulta'?'On-line':'Presencial');
   const request = async (action,data={}) => {
@@ -125,7 +124,7 @@
     return !item.actual_ended_at&&item.status==='Em atendimento'?text+' (em andamento)':text;
   };
   function eventCard(item) {
-    const card=button(`${item.start}–${item.end} · ${item.name} · ${item.procedure} · ${Number(item.price||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · ${item.attendance_type} · ${visitMode(item)} · ${item.status}`,()=>showDetails(item));
+    const card=button(`${item.start}–${item.end} · ${item.name} · ${item.procedure} · ${Number(item.price||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · ${visitMode(item)} · ${item.status}`,()=>showDetails(item));
     card.classList.add('schedule-event');card.dataset.status=item.status;return card;
   }
   function renderCalendar() {
@@ -203,8 +202,8 @@
       }); body.append(grid);
     } else {
       const wrap=document.createElement('div');wrap.className='schedule-table-wrap';const table=document.createElement('table');table.className='schedule-table';
-      const thead=document.createElement('thead'),head=document.createElement('tr');thead.append(head);table.append(thead);['Ações','Paciente','Horário agendado','Início real','Tempo da consulta','Procedimento / tipo','Local','Status','Modalidade'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.append(th);});
-      const tbody=document.createElement('tbody');table.append(tbody);rows.forEach(i=>{const row=document.createElement('tr'),actions=document.createElement('td');tbody.append(row);row.append(actions);if(isSecretary())actions.append(button('Editar agendamento',()=>edit(i)));else{const back=button('Voltar para a consulta',()=>attend(i,true));back.disabled=i.date!==today()||!['Em atendimento','Finalizado'].includes(i.status);back.title=i.date!==today()?'Dispon\u00edvel somente no mesmo dia da consulta':'Reabrir os dados salvos para edi\u00e7\u00e3o';actions.append(back);}if(!isSecretary()&&!['Cancelado','Faltou','Finalizado'].includes(i.status))actions.append(button('Atender',()=>attend(i)));[i.name,`${i.start}–${i.end}`,actualStart(i),actualDuration(i),`${i.procedure} / ${i.attendance_type}`,i.place_name,i.status,visitMode(i)].forEach((t,index)=>{const cell=document.createElement('td');if(index===6)cell.append(statusBadge(t));else cell.textContent=t;row.append(cell);});});
+      const thead=document.createElement('thead'),head=document.createElement('tr');thead.append(head);table.append(thead);['Ações','Paciente','Horário agendado','Início real','Tempo da consulta','Procedimento','Local','Status','Modalidade'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.append(th);});
+      const tbody=document.createElement('tbody');table.append(tbody);rows.forEach(i=>{const row=document.createElement('tr'),actions=document.createElement('td');tbody.append(row);row.append(actions);if(isSecretary())actions.append(button('Editar agendamento',()=>edit(i)));else{const back=button('Voltar para a consulta',()=>attend(i,true));back.disabled=i.date!==today()||!['Em atendimento','Finalizado'].includes(i.status);back.title=i.date!==today()?'Dispon\u00edvel somente no mesmo dia da consulta':'Reabrir os dados salvos para edi\u00e7\u00e3o';actions.append(back);}if(!isSecretary()&&!['Cancelado','Faltou','Finalizado'].includes(i.status))actions.append(button('Atender',()=>attend(i)));[i.name,`${i.start}–${i.end}`,actualStart(i),actualDuration(i),i.procedure,i.place_name,i.status,visitMode(i)].forEach((t,index)=>{const cell=document.createElement('td');if(index===6)cell.append(statusBadge(t));else cell.textContent=t;row.append(cell);});});
       if(!rows.length){const row=document.createElement('tr'),cell=document.createElement('td');row.append(cell);tbody.append(row);cell.colSpan=9;cell.textContent='Nenhuma consulta encontrada para os filtros selecionados.';} wrap.append(table);body.append(wrap);
     }
   }
@@ -218,7 +217,7 @@
     const previous=q('schedulePlaceFilter').value;q('schedulePlaceFilter').replaceChildren(option('','Todos os locais'));inputs.place_id.replaceChildren(option('','Selecione…'));
     Object.entries(places).forEach(([key,p])=>{const id=String(p.id||key);inputs.place_id.append(option(id,p.name));q('schedulePlaceFilter').append(option(id,p.name));});q('schedulePlaceFilter').value=previous;
   }
-  let editingId=null;
+  let editingId=null,editingAttendanceType='Consulta';
   let detailsItem=null,statusSaving=false;
   function showDetails(item) {
     detailsItem=item;q('scheduleDetailsPatient').textContent=item.name;
@@ -245,11 +244,11 @@
     finally{statusSaving=false;controls.forEach(id=>q(id).disabled=false);}
   };
   async function edit(item=null,time=settings.opening,date=q('scheduleDate').value) {
-    q('scheduleForm').reset();q('scheduleFormError').textContent='';editingId=item?.id||null;
+    q('scheduleForm').reset();q('scheduleFormError').textContent='';editingId=item?.id||null;editingAttendanceType=item?.attendance_type||'Consulta';
     selectedPatientCpf=item?.cpf||'';patientOptions.replaceChildren();
     refreshPlaces();q('scheduleFormHeading').textContent=item?'Editar agendamento':'Novo agendamento';
     const minutes=model.minutes(time)+Number(settings.default_duration);
-    const defaults={date,start:time,end:minutes<1440?model.time(minutes):'',procedure:'Consulta',attendance_type:'Consulta',visit_mode:item?visitMode(item):'Presencial',status:'Agendado'};
+    const defaults={date,start:time,end:minutes<1440?model.time(minutes):'',procedure:'Consulta',visit_mode:item?visitMode(item):'Presencial',status:'Agendado'};
     fields.forEach(([name])=>inputs[name].value=String(item?.[name]??defaults[name]??''));
     inputs.status.onchange();
     inputs.cpf.value=formatDoctorCpf(inputs.cpf.value);inputs.phone.value=formatPhone(inputs.phone.value);
@@ -276,7 +275,7 @@
     const item={...value,id:value.id||Date.now(),place_name:place?.name||''};memory=memory.filter(i=>i.id!==item.id);memory.push(item);return {ok:true,id:item.id};
   }
   q('scheduleForm').onsubmit=async event=>{
-    event.preventDefault(); const value=Object.fromEntries(fields.map(([name])=>[name,inputs[name].value.trim()]));value.id=editingId;value.cpf=digits(value.cpf);value.phone=digits(value.phone);
+    event.preventDefault(); const value=Object.fromEntries(fields.map(([name])=>[name,inputs[name].value.trim()]));value.id=editingId;value.attendance_type=editingAttendanceType;value.cpf=digits(value.cpf);value.phone=digits(value.phone);
     if(value.start>=value.end||patientAge(value.birth_date)===null||value.name.split(/\s+/).length<2){q('scheduleFormError').textContent='Confira nome completo, nascimento e horário final posterior ao inicial.';return;}
     q('scheduleSave').disabled=true;
     try {await save(value);q('scheduleDialog').close();await load();document.dispatchEvent(new Event('schedule:saved'));toast('Agendamento salvo.');}

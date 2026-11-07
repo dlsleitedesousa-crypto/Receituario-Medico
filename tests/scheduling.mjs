@@ -30,7 +30,7 @@ function setup(production=false, secretary=false) {
   return {nodes,inputs,requests,screen,listeners,context,created,shown:()=>shown};
 }
 const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',visit_mode:'Presencial',place_id:'1',status:'Agendado',notes:'<script>texto de teste</script>'};
-const fill=(s,values={})=>Object.entries({...data,...values}).forEach(([key,value])=>s.inputs[key].value=value);
+const fill=(s,values={})=>Object.entries({...data,...values}).filter(([key])=>key!=='attendance_type').forEach(([key,value])=>s.inputs[key].value=value);
 
 const detailsDialog=s=>s.created.find(node=>node.id==='scheduleDetailsDialog');
 const eventCard=s=>s.created.find(node=>node.dataset.status);
@@ -51,6 +51,7 @@ test('campo único seleciona paciente pelo nome e CPF e limpa dados ao trocar de
 test('modalidade on-line é salva, aparece no resumo e permanece ao editar',async()=>{
   const s=setup();s.nodes.get('#scheduleDate').value=data.date;
   assert.equal(s.inputs.insurance,undefined);
+  assert.equal(s.inputs.attendance_type,undefined);
   assert.deepEqual(s.inputs.visit_mode.options.map(option=>option.value),['Presencial','On-line']);
   fill(s,{visit_mode:'On-line'});
   await s.nodes.get('#scheduleForm').onsubmit({preventDefault(){}});
