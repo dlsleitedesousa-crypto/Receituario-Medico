@@ -10,6 +10,8 @@ test('cadastro exige somente nome, CPF e nascimento',()=>{
   const required=[...form.matchAll(/<input\b[^>]*\brequired\b[^>]*>/g)].map(match=>match[0].match(/id="([^"]+)"/)[1]);
   assert.deepEqual(required,['newPatientName','newPatientBirthDate','newPatientCpf']);
   assert.ok(form.includes('id="newPatientEmail" type="email"'));
+  assert.equal(form.includes('patientInsurance'),false);
+  assert.equal(form.includes('newPatientInsurance'),false);
 });
 
 test('filtros de pacientes combinam nome sem acentos, CPF, código, nascimento e telefone',()=>{

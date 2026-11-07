@@ -14,8 +14,7 @@
     sex:'Sex',gender:'Gender',rg:'Rg',rg_issuer:'RgIssuer',marital_status:'MaritalStatus',
     passport:'Passport',birth_certificate:'BirthCertificate',email:'Email',landline:'Landline',other_phone:'OtherPhone',
     postal_code:'PostalCode',street:'Street',number:'Number',complement:'Complement',neighborhood:'Neighborhood',
-    city:'City',state:'State',ibge_code:'IbgeCode',birthplace:'Birthplace',insurance:'Insurance',
-    insurance_plan:'InsurancePlan',insurance_card:'InsuranceCard',notes:'Notes'
+    city:'City',state:'State',ibge_code:'IbgeCode',birthplace:'Birthplace',notes:'Notes'
   };
   const registrationInputs = Object.fromEntries(Object.entries({name:'Name',cpf:'Cpf',birth_date:'BirthDate',phone:'Phone',...optionalFields})
     .map(([key,suffix])=>[key,document.querySelector('#newPatient'+suffix)]));

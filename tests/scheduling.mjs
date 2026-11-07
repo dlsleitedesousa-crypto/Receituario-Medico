@@ -29,11 +29,33 @@ function setup(production=false, secretary=false) {
   const inputs=Object.fromEntries(fields.map(label=>{const input=label.children[1];return [input.name,input];}));
   return {nodes,inputs,requests,screen,listeners,context,created,shown:()=>shown};
 }
-const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',place_id:'1',status:'Agendado',insurance:'',notes:'<script>texto de teste</script>'};
+const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',visit_mode:'Presencial',place_id:'1',status:'Agendado',notes:'<script>texto de teste</script>'};
 const fill=(s,values={})=>Object.entries({...data,...values}).forEach(([key,value])=>s.inputs[key].value=value);
 
 const detailsDialog=s=>s.created.find(node=>node.id==='scheduleDetailsDialog');
 const eventCard=s=>s.created.find(node=>node.dataset.status);
+
+test('modalidade on-line é salva, aparece no resumo e permanece ao editar',async()=>{
+  const s=setup();s.nodes.get('#scheduleDate').value=data.date;
+  assert.equal(s.inputs.insurance,undefined);
+  assert.deepEqual(s.inputs.visit_mode.options.map(option=>option.value),['Presencial','On-line']);
+  fill(s,{visit_mode:'On-line'});
+  await s.nodes.get('#scheduleForm').onsubmit({preventDefault(){}});
+  assert.match(eventCard(s).textContent,/On-line/);eventCard(s).onclick();
+  assert.match(s.nodes.get('#scheduleDetailsSummary').textContent,/On-line/);
+  await s.nodes.get('#scheduleDetailsEdit').onclick();assert.equal(s.inputs.visit_mode.value,'On-line');
+});
+
+test('agendamentos antigos continuam editáveis e teleconsulta usa modalidade on-line',async()=>{
+  for(const attendance_type of ['Consulta','Teleconsulta']) {
+    const s=setup(true),item={...data,id:20,attendance_type};delete item.visit_mode;
+    s.nodes.get('#scheduleDate').value=data.date;
+    s.context.fetch=async()=>({ok:true,json:async()=>({ok:true,items:[item]})});
+    await s.nodes.get('.rx-nav').children[0].onclick();eventCard(s).onclick();
+    await s.nodes.get('#scheduleDetailsEdit').onclick();
+    assert.equal(s.inputs.visit_mode.value,attendance_type==='Teleconsulta'?'On-line':'Presencial');
+  }
+});
 
 test('clique no agendamento permite salvar cada status para profissional e secretaria',async()=>{
   for(const secretary of [false,true]) {

@@ -4,10 +4,12 @@ declare(strict_types=1);
 function schedulingValues(array $data): array {
     foreach (['cpf','phone'] as $key) $data[$key] = preg_replace('/\D/', '', (string)($data[$key] ?? ''));
     $value = [];
-    foreach (['name'=>180,'cpf'=>11,'birth_date'=>10,'phone'=>30,'date'=>10,'start'=>5,'end'=>5,'procedure'=>180,'attendance_type'=>80,'insurance'=>120,'notes'=>4000,'status'=>30,'email'=>190,'city'=>180,'sex'=>30] as $key=>$limit) {
+    foreach (['name'=>180,'cpf'=>11,'birth_date'=>10,'phone'=>30,'date'=>10,'start'=>5,'end'=>5,'procedure'=>180,'attendance_type'=>80,'visit_mode'=>20,'insurance'=>120,'notes'=>4000,'status'=>30,'email'=>190,'city'=>180,'sex'=>30] as $key=>$limit) {
         $value[$key] = trim((string)($data[$key] ?? ''));
         if (mb_strlen($value[$key]) > $limit) throw new InvalidArgumentException('Campo muito longo: ' . $key);
     }
+    if (!array_key_exists('visit_mode',$data)) $value['visit_mode'] = $value['attendance_type']==='Teleconsulta' ? 'On-line' : 'Presencial';
+    if (!in_array($value['visit_mode'],['Presencial','On-line'],true)) throw new InvalidArgumentException('Selecione atendimento presencial ou on-line.');
     if ($value['phone'] !== '' && !preg_match('/^\d{10,11}$/D', $value['phone'])) throw new InvalidArgumentException('Informe telefone com DDD e 10 ou 11 dígitos.');
     if ($value['email']!=='' && !filter_var($value['email'],FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Informe um e-mail válido.');
     if ($value['sex']!=='' && !in_array($value['sex'],['Não informado','Feminino','Masculino','Intersexo'],true)) throw new InvalidArgumentException('Sexo biológico inválido.');
