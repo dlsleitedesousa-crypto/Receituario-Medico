@@ -25,8 +25,8 @@ function setup(production=false, secretary=false) {
   vm.runInContext(readFileSync(new URL('../agenda-model.js',import.meta.url),'utf8'),context);
   vm.runInContext(readFileSync(new URL('../scheduling.js',import.meta.url),'utf8'),context);
   context.selectedPlace={id:1};
-  const screen=document.body.children[0], fields=nodes.get('#scheduleFields').children;
-  const inputs=Object.fromEntries(fields.map(label=>{const input=label.children[1];return [input.name,input];}));
+  const screen=document.body.children[0];
+  const inputs=Object.fromEntries(created.filter(input=>input.name).map(input=>[input.name,input]));
   return {nodes,inputs,requests,screen,listeners,context,created,shown:()=>shown};
 }
 const data={name:'Paciente Fictício',cpf:'12345678901',birth_date:'2000-01-01',date:'2026-11-01',phone:'',start:'09:00',end:'09:20',procedure:'Consulta',attendance_type:'Consulta',visit_mode:'Presencial',place_id:'1',status:'Agendado',notes:'<script>texto de teste</script>'};
@@ -34,6 +34,19 @@ const fill=(s,values={})=>Object.entries({...data,...values}).forEach(([key,valu
 
 const detailsDialog=s=>s.created.find(node=>node.id==='scheduleDetailsDialog');
 const eventCard=s=>s.created.find(node=>node.dataset.status);
+
+test('campo único seleciona paciente pelo nome e CPF e limpa dados ao trocar de pessoa',async()=>{
+  const s=setup(true),patients=[{...data,id:1},{...data,id:2,cpf:'00000000002',birth_date:'1990-02-03',phone:'00900000002'}];
+  s.context.fetch=async()=>({ok:true,json:async()=>({ok:true,items:patients})});
+  await s.nodes.get('#scheduleNew').onclick();
+  const suggestions=s.created.find(node=>node.id==='schedulePatientOptions');
+  assert.equal(suggestions.children.length,2);
+  s.inputs.name.value=suggestions.children[1].value;s.inputs.name.oninput();
+  assert.equal(s.inputs.name.value,data.name);assert.equal(s.inputs.cpf.value,'000.000.000-02');assert.equal(s.inputs.birth_date.value,'1990-02-03');
+  assert.equal(s.nodes.get('#scheduleFields').children.some(label=>label.children[1]?.name==='name'),false);
+  s.inputs.name.value='Outra Pessoa';s.inputs.name.oninput();
+  assert.equal(s.inputs.cpf.value,'');assert.equal(s.inputs.birth_date.value,'');assert.equal(s.inputs.phone.value,'');
+});
 
 test('modalidade on-line é salva, aparece no resumo e permanece ao editar',async()=>{
   const s=setup();s.nodes.get('#scheduleDate').value=data.date;

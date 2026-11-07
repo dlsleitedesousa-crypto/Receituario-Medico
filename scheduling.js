@@ -6,7 +6,7 @@
   let items = [], memory = [], patients = [], mode = 'agenda', sequence = 0;
   const screen = document.createElement('section');
   screen.id = 'schedulingScreen'; screen.className = 'screen hidden';
-  screen.innerHTML = `<header class="top"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Agenda e consultas</small></div></div><button class="btn outline" id="scheduleBack">← Início</button></header><main class="page"><nav class="home-tabs" aria-label="Agenda e consultas"><button class="home-tab" id="scheduleAgenda">Agendamentos</button><button class="home-tab" id="scheduleConsultations">Consultas</button></nav><div class="schedule-title"><div><span class="eyebrow">Organização dos atendimentos</span><h1 id="scheduleHeading">Agendamentos</h1><p id="scheduleProfessional"></p></div><button class="btn blue" id="scheduleNew">+ Novo agendamento</button></div><div class="schedule-toolbar"><button class="btn outline" id="schedulePrevious" aria-label="Dia anterior">‹</button><button class="btn outline" id="scheduleToday">Hoje</button><button class="btn outline" id="scheduleNext" aria-label="Próximo dia">›</button><label class="field"><span>Data</span><input type="date" id="scheduleDate" required></label><label class="field"><span>Local</span><select id="schedulePlaceFilter"><option value="">Todos os locais</option></select></label><label class="field"><span>Buscar paciente</span><input id="scheduleSearch" type="search" placeholder="Nome ou CPF"></label><label id="scheduleFinishedFilter"><input type="checkbox" id="scheduleFinished"> Mostrar finalizados e cancelados</label></div><p id="scheduleFeedback" role="status" aria-live="polite"></p><div id="scheduleBody"></div><dialog id="scheduleDialog"><form id="scheduleForm"><div class="schedule-title"><h2 id="scheduleFormHeading">Novo agendamento</h2><button class="btn outline" type="button" id="scheduleClose" aria-label="Fechar cadastro">✕</button></div><p>Busque um paciente cadastrado ou preencha os dados para cadastrá-lo junto ao agendamento.</p><div class="schedule-fields"><label class="field wide"><span>Paciente cadastrado</span><select id="schedulePatient"><option value="">Novo paciente / selecionar cadastro</option></select></label></div><div class="schedule-fields" id="scheduleFields"></div><p id="scheduleFormError" role="alert"></p><div class="schedule-form-actions"><button class="btn outline" type="button" id="scheduleCancel">Voltar</button><button class="btn blue" type="submit" id="scheduleSave">Salvar agendamento</button></div></form></dialog></main>`;
+  screen.innerHTML = `<header class="top"><div class="logo"><div class="mark">FR</div><div><b>Flow Receita</b><small>Agenda e consultas</small></div></div><button class="btn outline" id="scheduleBack">← Início</button></header><main class="page"><nav class="home-tabs" aria-label="Agenda e consultas"><button class="home-tab" id="scheduleAgenda">Agendamentos</button><button class="home-tab" id="scheduleConsultations">Consultas</button></nav><div class="schedule-title"><div><span class="eyebrow">Organização dos atendimentos</span><h1 id="scheduleHeading">Agendamentos</h1><p id="scheduleProfessional"></p></div><button class="btn blue" id="scheduleNew">+ Novo agendamento</button></div><div class="schedule-toolbar"><button class="btn outline" id="schedulePrevious" aria-label="Dia anterior">‹</button><button class="btn outline" id="scheduleToday">Hoje</button><button class="btn outline" id="scheduleNext" aria-label="Próximo dia">›</button><label class="field"><span>Data</span><input type="date" id="scheduleDate" required></label><label class="field"><span>Local</span><select id="schedulePlaceFilter"><option value="">Todos os locais</option></select></label><label class="field"><span>Buscar paciente</span><input id="scheduleSearch" type="search" placeholder="Nome ou CPF"></label><label id="scheduleFinishedFilter"><input type="checkbox" id="scheduleFinished"> Mostrar finalizados e cancelados</label></div><p id="scheduleFeedback" role="status" aria-live="polite"></p><div id="scheduleBody"></div><dialog id="scheduleDialog"><form id="scheduleForm"><div class="schedule-title"><h2 id="scheduleFormHeading">Novo agendamento</h2><button class="btn outline" type="button" id="scheduleClose" aria-label="Fechar cadastro">✕</button></div><p>Busque um paciente cadastrado ou preencha os dados para cadastrá-lo junto ao agendamento.</p><div class="schedule-fields" id="schedulePatientField"></div><div class="schedule-fields" id="scheduleFields"></div><p id="scheduleFormError" role="alert"></p><div class="schedule-form-actions"><button class="btn outline" type="button" id="scheduleCancel">Voltar</button><button class="btn blue" type="submit" id="scheduleSave">Salvar agendamento</button></div></form></dialog></main>`;
   document.body.append(screen);
   const q = id => screen.querySelector('#' + id);
   const detailsDialog=document.createElement('dialog');detailsDialog.id='scheduleDetailsDialog';
@@ -36,13 +36,14 @@
   const inputs = {};
   const option = (value, label=value) => { const el=document.createElement('option'); el.value=value; el.textContent=label; return el; };
   fields.forEach(([name,label,type,max,required]) => {
-    const wrapper=document.createElement('label'); wrapper.className='field'+(name==='notes'?' wide':'');
+    const wrapper=document.createElement('label'); wrapper.className='field'+(['name','place_id','notes'].includes(name)?' wide':'');
     const caption=document.createElement('span'); caption.textContent=label+(required?' *':'');
     const input=document.createElement(type==='select'?'select':type==='textarea'?'textarea':'input');
     if (input.tagName==='INPUT') input.type=type;
     input.name=name; input.required=required; if(max) input.maxLength=max;
     if(name==='cpf') { input.inputMode='numeric'; input.placeholder='000.000.000-00'; input.pattern='[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2}'; }
-    inputs[name]=input; wrapper.append(caption,input); q('scheduleFields').append(wrapper);
+    inputs[name]=input; wrapper.append(caption,input);
+    if(name==='name')q('schedulePatientField').append(wrapper);else q('scheduleFields').append(wrapper);
   });
   const digits = value => String(value||'').replace(/\D/g,'');
   const formatPhone = value => {
@@ -84,12 +85,21 @@
   inputs.procedure.onchange=()=>{const p=selectedProcedure();if(p){inputs.price.value=Number(p.price).toFixed(2);inputs.place_id.value=String(p.place_id);updateEnd();}};
   inputs.start.onchange=updateEnd;
   ['Não informado','Feminino','Masculino','Intersexo'].forEach(value=>inputs.sex.append(option(value)));
-  const patientSearch=document.createElement('input');patientSearch.type='search';patientSearch.placeholder='Buscar paciente por nome ou CPF';patientSearch.setAttribute('aria-label','Buscar paciente cadastrado');
-  q('schedulePatient').before(patientSearch);
-  patientSearch.oninput=()=>{
-    const search=patientSearch.value.trim().toLocaleLowerCase('pt-BR');
-    q('schedulePatient').replaceChildren(option('','Novo paciente / selecionar cadastro'));
-    patients.filter(p=>(p.name+' '+p.cpf).toLocaleLowerCase('pt-BR').includes(search)).forEach(p=>q('schedulePatient').append(option(p.id,`${p.name} · ${p.cpf}`)));
+  const patientOptions=document.createElement('datalist');patientOptions.id='schedulePatientOptions';
+  q('schedulePatientField').append(patientOptions);
+  inputs.name.setAttribute('list','schedulePatientOptions');inputs.name.autocomplete='off';
+  inputs.name.placeholder='Buscar por nome ou CPF, ou digitar o nome de um novo paciente';
+  let selectedPatientCpf='';
+  const patientLabel=patient=>`${patient.name} · ${patient.cpf}`;
+  inputs.name.oninput=()=>{
+    const patient=patients.find(p=>patientLabel(p)===inputs.name.value);
+    if(patient){
+      for(const name of ['name','cpf','birth_date','phone'])inputs[name].value=name==='cpf'?formatDoctorCpf(patient[name]):name==='phone'?formatPhone(patient[name]):patient[name]||'';
+      selectedPatientCpf=patient.cpf;
+    } else if(selectedPatientCpf){
+      for(const name of ['cpf','birth_date','phone'])inputs[name].value='';
+      selectedPatientCpf='';
+    }
   };
   const statusBadge=status=>{const badge=document.createElement('span');badge.className='schedule-status-badge';badge.dataset.scheduleStatus=status;badge.textContent=status;return badge;};
   screen.querySelector('.agenda-legend').replaceChildren(...statuses.map(statusBadge));
@@ -236,13 +246,12 @@
   };
   async function edit(item=null,time=settings.opening,date=q('scheduleDate').value) {
     q('scheduleForm').reset();q('scheduleFormError').textContent='';editingId=item?.id||null;
-    patientSearch.value='';
+    selectedPatientCpf=item?.cpf||'';patientOptions.replaceChildren();
     refreshPlaces();q('scheduleFormHeading').textContent=item?'Editar agendamento':'Novo agendamento';
     const minutes=model.minutes(time)+Number(settings.default_duration);
     const defaults={date,start:time,end:minutes<1440?model.time(minutes):'',procedure:'Consulta',attendance_type:'Consulta',visit_mode:item?visitMode(item):'Presencial',status:'Agendado'};
     fields.forEach(([name])=>inputs[name].value=String(item?.[name]??defaults[name]??''));
     inputs.status.onchange();
-    q('schedulePatient').replaceChildren(option('','Novo paciente / selecionar cadastro'));
     inputs.cpf.value=formatDoctorCpf(inputs.cpf.value);inputs.phone.value=formatPhone(inputs.phone.value);
     inputs.price.value=item?.price??'0.00';
     inputs.procedure.replaceChildren(option('','Selecione o procedimento'));
@@ -255,10 +264,9 @@
       else {const p=gridSelection()||catalog.find(p=>!q('schedulePlaceFilter').value||String(p.place_id)===q('schedulePlaceFilter').value);if(p){[...inputs.procedure.options].find(o=>o.dataset.id===String(p.id)).selected=true;inputs.procedure.onchange();}else q('scheduleFormError').textContent='Cadastre os procedimentos em Meu perfil → Configurações de agendamentos.';}
       q('scheduleSave').disabled=false;
     } catch(e){q('scheduleFormError').textContent=e.message;return;}
-    try { patients=local?[]:(await request('patients.list')).items;patients.forEach(p=>q('schedulePatient').append(option(p.id,`${p.name} · ${p.cpf}`))); }
+    try { patients=local?[]:(await request('patients.list')).items;patients.forEach(p=>patientOptions.append(option(patientLabel(p)))); }
     catch(e){q('scheduleFormError').textContent='Busca de pacientes indisponível: '+e.message;}
   }
-  q('schedulePatient').onchange=()=>{const p=patients.find(p=>String(p.id)===q('schedulePatient').value);if(p)for(const name of ['name','cpf','birth_date','phone'])inputs[name].value=name==='cpf'?formatDoctorCpf(p[name]):name==='phone'?formatPhone(p[name]):p[name]||'';};
   async function save(value) {
     if(!local)return request('schedule.save',value);
     const previous=memory.find(i=>i.id===value.id);
